@@ -6,7 +6,7 @@
 ## TODO Timeline
 Please add things if you notice something needs to be done. I've outlined a very rough timeline. Individual tasks are in random order.
 
-#### TODO by ~2/15-2/20
+#### TODO by ~2/22-2/25
 - [ ] Implement synthesizer without conflict learning (see below in `Ideas`)
 - [x] Figure out how to use SyGus as input
 - A basic parser has been added to `parser.py` in `src`.
