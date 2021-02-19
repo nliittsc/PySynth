@@ -1,6 +1,6 @@
 # Being explicit about Types
 Symbol = str
-Number = int
+Number = (int, float)
 Atom = (Symbol, Number)
 List = list
 Expr = (Atom, List)
@@ -64,7 +64,7 @@ def atom(token: str) -> Atom:
 
 def get_start(cmd) -> str:
     assert (cmd[0] == "synth-fun")
-    return cmd[4][0][0]
+    return cmd[4][0]
 
 
 def get_nonterminals(cmd):
@@ -88,7 +88,6 @@ def get_terms_prods(cmd):
         for t in nonterm_list[2]:
             # Non-terminals that go with a production
             nts = []
-            print(t)
             try:
                 # gets a terminal from the input, e.g., `"+"`
                 term = t[0]
@@ -109,10 +108,8 @@ def get_grammar(input_str : str):
     s_exprs = []
     for line in lines:
         s_exprs.append(parse(line))
-    print(s_exprs)
     for s in s_exprs:
         if s[0] == "synth-fun":
-            print(s)
             start_sym = get_start(s)
             nonterminals = get_nonterminals(s)
             terminals, productions = get_terms_prods(s)
