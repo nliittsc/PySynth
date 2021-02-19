@@ -52,6 +52,20 @@ always assumes that (1) there is a `synth-fun` command in the input (e.g., examp
   
   
 ## Ideas on how to proceed:
+Roughly, in order:
+* Create an `ast.py` file and create an `class AST` object that can support
+representing a program as an abstract syntax tree.
+  
+* Get a basic `decide()` subroutine that can choose a hole in the AST, and fill
+it with a production rule.
+  
+* Fill the other subroutines with dummies to get an end-to-end starter code base
+
+* Fill in the dummy functions until we have a real CEGIS loop
+
+* Synthesize some basic programs
+
+* Add Conflict Driven Learning to the algorithm
 
 ## Helpful Links & Information
 
