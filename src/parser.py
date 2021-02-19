@@ -82,31 +82,34 @@ def get_nonterminals(cmd):
 def get_terms_prods(cmd):
     terminals = set()
     productions = {}
-    for p in cmd[5]:
-        nt = p[0]
-        re = []
-        for t in p[2]:
+    for nonterm_list in cmd[5]:
+        non_term = nonterm_list[0]
+        product = []
+        for t in nonterm_list[2]:
+            # Non-terminals that go with a production
+            nts = []
             try:
+                # gets a terminal from the input, e.g., `"+"`
                 term = t[0]
-                rere = []
+                # List of potential non-terminal children, e.g, `["I", "I"]` for `"+"`
                 if len(t) > 1:
-                    for tt in t[1:]:
-                        rere.append(tt)
-                    productions[term] = rere
+                    for nt in t[1:]:
+                        nts.append(nt)
             except:
                 term = t
             if term not in terminals:
                 terminals.add(term)
-            re.append(term)
-        productions[nt] = re
+            product.append((term, nts))
+        productions[non_term] = product
     return terminals, productions
 
-
-# path = r"src\\examples\\example1.sl"
-path = r"C:\Users\18315\Dev\Homework\ProgramSynthesisProject\synthpy\src\examples\example1.sl"
-with open(path) as f:
-    data = f.read()
-    lines = input_to_list(data)
-    parsed = []
+def get_grammar(input_str : str):
+    lines = input_to_list(input_str)
+    s_exprs = []
     for line in lines:
-        parsed.append(parse(line))
+        s_exprs.append(parse(line))
+    start_sym = get_start(s_exprs[1])
+    nonterminals = get_nonterminals(s_exprs[1])
+    terminals, productions = get_terms_prods(s_exprs[1])
+    return nonterminals, terminals, productions, start_sym
+
