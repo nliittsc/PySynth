@@ -88,6 +88,7 @@ def get_terms_prods(cmd):
         for t in nonterm_list[2]:
             # Non-terminals that go with a production
             nts = []
+            print(t)
             try:
                 # gets a terminal from the input, e.g., `"+"`
                 term = t[0]
@@ -108,8 +109,12 @@ def get_grammar(input_str : str):
     s_exprs = []
     for line in lines:
         s_exprs.append(parse(line))
-    start_sym = get_start(s_exprs[1])
-    nonterminals = get_nonterminals(s_exprs[1])
-    terminals, productions = get_terms_prods(s_exprs[1])
-    return nonterminals, terminals, productions, start_sym
+    print(s_exprs)
+    for s in s_exprs:
+        if s[0] == "synth-fun":
+            print(s)
+            start_sym = get_start(s)
+            nonterminals = get_nonterminals(s)
+            terminals, productions = get_terms_prods(s)
+            return nonterminals, terminals, productions, start_sym
 

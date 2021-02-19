@@ -43,7 +43,13 @@ Please add things if you notice something needs to be done. I've outlined a very
 
 ## Known Bugs and Issues:
 
-- [x] Everything works so far! :)
+- [ ] Everything works so far! :)
+* **Bug**: Some examples don't parse correctly, because the parser I wrote 
+always assumes that (1) there is a `synth-fun` command in the input (e.g., example
+  6 lacks this) and (2) each terminal symbol is actually a char or int,
+  and not another list (e.g., example 2, line 10). Problem (1) can be ignored,
+  we will just always assume `synth-fun` is present. Problem (2) might need to be fixed.
+  
   
 ## Ideas on how to proceed:
 

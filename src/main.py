@@ -4,6 +4,7 @@ from src.parser import get_grammar
 def main():
     # Example:
     dir = os.path.dirname(__file__)
+    # NOTE: Certain examples don't parse at the moment. See more in the README
     file = "examples\example1.sl"
     filename = os.path.join(dir, file)
     with open(filename) as f:
