@@ -88,13 +88,13 @@ def get_terms_prods(cmd):
         for t in nonterm_list[2]:
             # Non-terminals that go with a production
             nts = []
-            try:
+
+            if isinstance(t, list):
                 # gets a terminal from the input, e.g., `"+"`
                 term = t[0]
                 # List of potential non-terminal children, e.g, `["I", "I"]` for `"+"`
-                if len(t) > 1:
-                    nts += t[1:]
-            except:
+                nts += t[1:]
+            else:
                 term = t
 
             if isinstance(term, list):

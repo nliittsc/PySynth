@@ -22,7 +22,8 @@ def arg_max(holes: list):
 def decide(ast: AST):
     holes = ast.holes()
     prods = ast.prods
-    v0 = [(h, p) for h in holes for p in prods[h.non_terminal[0]]]
+
+    v0 = [(h, p) for h in holes for p in prods[h.non_terminal]]
     v1 = [hp for hp in v0 if is_sat()]
     return arg_max(v1)
 
@@ -89,7 +90,7 @@ def main():
     # Example:
     dir = os.path.dirname(__file__)
     # NOTE: Certain examples don't parse at the moment. See more in the README
-    file = "examples/example2.sl"
+    file = "examples/example3.sl"
     filename = os.path.join(dir, file)
     with open(filename) as f:
         input_str = f.read()
