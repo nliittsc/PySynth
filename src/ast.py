@@ -150,9 +150,9 @@ class AST:
             r = self.root
         if r.num_children == 0:
             if r.is_hole():
-                return [r.non_terminal]
+                return r.non_terminal
             else:
-                return [r.terminal]
+                return r.terminal
         else:
             children = []
             for c in r.children:
