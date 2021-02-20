@@ -96,8 +96,11 @@ def get_terms_prods(cmd):
                     nts += t[1:]
             except:
                 term = t
-            if term not in terminals:
-                terminals.add(term)
+
+            if isinstance(term, list):
+                term = tuple(term)
+            terminals.add(term)
+
             product.append((term, nts))
         productions[non_term] = product
     return terminals, productions
