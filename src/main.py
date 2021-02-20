@@ -4,7 +4,6 @@ from src.parser import get_grammar
 from src.ast import Node, AST, label, root
 
 
-
 # Dummy functions for now. Corresponds to checking if fill(P, H, p) ~ Omega in the paper
 def is_sat():
     return True
@@ -90,7 +89,7 @@ def main():
     # Example:
     dir = os.path.dirname(__file__)
     # NOTE: Certain examples don't parse at the moment. See more in the README
-    file = "examples\example1.sl"
+    file = "examples/example1.sl"
     filename = os.path.join(dir, file)
     with open(filename) as f:
         input_str = f.read()

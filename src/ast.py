@@ -1,15 +1,19 @@
-from typing import Union
+from typing import Union, Tuple, Set
 
 # Explict about what a 'Production' means. LHS `str` is a terminal symbol, and the RHS `[str]` are the 'inputs',
 # which may be empty. E.g., "I" -> (0, []) is a valid production rule since `0` is a terminal symbol that needs no
 # inputs.
 Terminal = Union[str, int, float]
-Production = tuple[Terminal, [str]]
+Production = Tuple[Terminal, str]
 
 
 # This Node class will represent a part of a program
 class Node:
     def __init__(self, symbol: str, k: int = None, d: int = None, i: int = None):
+        self.d = d
+        self.k = k
+        self.i = i
+
         if d is None:
             self.d = 0
         if k is None:
@@ -17,9 +21,6 @@ class Node:
         if i is None:
             self.i = 0
 
-        self.d = d
-        self.k = k
-        self.i = i
         self.id = label(k, d, i)
         # Just some aliases for the non-terminal
         self.A = symbol
@@ -101,7 +102,7 @@ class AST:
         return r
 
     # Returns a set of holes (nodes) starting at the root or some given node
-    def holes(self, r : Node = None) -> set[Node]:
+    def holes(self, r : Node = None) -> Set[Node]:
         if r is None:
             r = self.root
         holes = set()

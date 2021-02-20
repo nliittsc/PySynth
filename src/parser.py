@@ -93,8 +93,7 @@ def get_terms_prods(cmd):
                 term = t[0]
                 # List of potential non-terminal children, e.g, `["I", "I"]` for `"+"`
                 if len(t) > 1:
-                    for nt in t[1:]:
-                        nts.append(nt)
+                    nts += t[1:]
             except:
                 term = t
             if term not in terminals:
