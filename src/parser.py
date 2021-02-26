@@ -26,7 +26,7 @@ def input_to_list(string: str) -> [str]:
 
 def tokenize(chars: str) -> list:
     "Convert a string of characters into a list of tokens."
-    return chars.replace('(', ' ( ').replace(')', ' ) ').split()
+    return chars.replace('(', ' ( ').replace(')', ' ) ').replace('" "', 'space').split()
 
 
 def parse(program: str) -> Expr:
@@ -105,8 +105,7 @@ def get_terms_prods(cmd):
         productions[non_term] = product
     return terminals, productions
 
-def get_grammar(input_str : str):
-    lines = input_to_list(input_str)
+def get_grammar(lines: [str]):
     s_exprs = []
     for line in lines:
         s_exprs.append(parse(line))

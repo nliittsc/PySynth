@@ -1,4 +1,7 @@
+from z3 import *
 from typing import Union, Tuple, Set
+
+
 
 # Explict about what a 'Production' means. LHS `str` is a terminal symbol, and the RHS `[str]` are the 'inputs',
 # which may be empty. E.g., "I" -> (0, []) is a valid production rule since `0` is a terminal symbol that needs no
@@ -21,7 +24,7 @@ class Node:
         if i is None:
             self.i = 0
 
-        self.id = label(k, d, i)
+        #self.id = label(k, d, i)    # We should probably do this during fill
         # Just some aliases for the non-terminal
         self.A = symbol
         self.non_terminal = symbol
@@ -48,17 +51,21 @@ class Node:
 
     # Helper that applies a production rule to a node.
     def apply_prod(self, p: Production):
-        #print(f"applying production: {p[0]}")
         self.terminal = p[0]
-        d: int = self.d
-        k: int = self.k
         syms = p[1]
         n: int = len(p[1])
         for i in range(n):
-            node = Node(syms[i], k, d+1, i+1)
+            node = Node(syms[i])
             self.children.append(node)
         self.num_children = n
         return self
+
+    # returns a symbolic variable (compatible with python's Z3 api) that encodes the node as a boolean
+    def encode_node(self):
+        if self.is_hole():
+            raise ValueError(f"No production assigned to node {self.id}")
+        c = f"c({self.id}, {self.terminal})"
+        return Bool(c)
 
 
 
@@ -68,10 +75,7 @@ def label(k: int, d:int, i: int) -> int:
     return (k ** (d - 1)) + i - 1
 
 
-# Helper to initialize a root node
-def root(start_symbol: str, k: int) -> Node:
-    r = Node(start_symbol[0], 1, k, 1)
-    return r
+
 
 # This AST class represents a partial or complete program. One should pass a 4-tuple representing a grammar G
 class AST:
@@ -86,6 +90,9 @@ class AST:
         self.arity = None
         self.root = None
 
+        # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
+        self.num_at_depth = {}
+
     # Computes the maximum arity of the grammar operators
     def max_arity(self) -> int:
         arities = []
@@ -97,8 +104,13 @@ class AST:
     def make_root(self) -> Node:
         k: int = self.max_arity()
         self.arity = k
-        r: Node = Node(self.start_symbol, self.arity, 1, 1)
+        r: Node = Node(self.start_symbol)
+        r.id = label(self.arity, 1, 1)
+        r.d = 1
+        r.k = k
+        r.i = 1
         self.root = r
+        self.num_at_depth[1] = 1
         return r
 
     # Returns a set of holes (nodes) starting at the root or some given node
@@ -116,7 +128,7 @@ class AST:
         return holes
 
     # DFS search for the tree, to find a node with the matching ID, initialized to root if not passed
-    def search(self, id: int, r : Node = None) -> Node:
+    def search(self, id: int, r: Node = None) -> Node:
         if r is None:
             r = self.root
         stack = [r]
@@ -132,18 +144,63 @@ class AST:
     def fill(self, node: Node, id: int, p: Production):
         if node.id == id:
             node = node.apply_prod(p)
+
+            # Update the labels of the children nodes, making sure each node has a unique label
+            # Also update the number of ndoes at depth d+1, after the production is applied
+            d: int = node.d
+            k: int = node.k
+            if d+1 not in self.num_at_depth.keys():  # Create a new mapping
+                self.num_at_depth[d+1] = node.num_children
+                labeled_children = []
+                if node.num_children > 0:
+                    for (i, c) in enumerate(node.children):
+                        c.id = label(k, d+1, i+1)
+                        c.d = d+1
+                        c.k = k
+                        c.i = i+1
+                        labeled_children.append(c)
+
+            else:
+                m: int = self.num_at_depth[d+1]
+                self.num_at_depth[d+1] += node.num_children
+                labeled_children = []
+                if node.num_children > 0:
+                    for (i, c) in enumerate(node.children):
+                        c.id = label(k, d+1, i+m+1)
+                        c.d = d+1
+                        c.k = k
+                        labeled_children.append(c)
+
+            node.children = labeled_children
             return node
         elif node.num_children == 0:
             return node
         else:
             new_children = [self.fill(c, id, p) for c in node.children]
             node.children = new_children
+
             return node
 
     # Checks if a program has all its holes filled, and is thus a full program
     def is_concrete(self):
         holes = self.holes()
         return len(holes) == 0
+
+    # Returns the partial program as a SAT formula that is compatible with python's Z3 API
+    def encode(self):
+        r = self.root
+        encoded_vars = []
+        stack = [r]
+        while stack:
+            v = stack.pop(0)
+            if not v.is_hole():  # Can only encode nodes where a production is applied
+                encoded_vars.append(v.encode_node())
+                for c in v.children:
+                    stack.append(c)
+        # Return the conjunction of the boolean variables
+        return encoded_vars
+
+
 
     # converts the AST to an S-expression representing a program
     def to_program(self, r: Node = None):
@@ -161,20 +218,12 @@ class AST:
                 children.append(p)
             return [r.terminal, children]
 
-    def print_program_(self, partial):
-        prog = "("
-        for s in partial:
-            if isinstance(s, list):
-                prog += " " + self.print_program_(s)
-            else:
-              prog += " " + str(s)
-        prog += " )"
-        return prog
+
+
 
     # Can work on this more later
     def print_program(self):
         program = self.to_program()
-        #p = self.print_program_(program)
         #print(p)
         print(program)
 
