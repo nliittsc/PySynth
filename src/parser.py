@@ -1,119 +1,297 @@
-# Being explicit about Types
-Symbol = str
-Number = (int, float)
-Atom = (Symbol, Number)
-List = list
-Expr = (Atom, List)
+import ply.yacc as yacc
 
+from lexer import tokens
+from sygus_ast import *
 
-def input_to_list(string: str) -> [str]:
-    "Parse a .sl file into a list of S-Expressions."
-    n: int = 0
-    result: [str] = []
-    s: str = ""
-    for c in string:
-        if c == "(":
-            n += 1
-        if c == ")":
-            n -= 1
-        if c != "\n":
-            s += c
-        if n == 0 and s != "":
-            result.append(s)
-            s = ""
-    return result
+# generic functions
+def p_EmptyL(p):
+    'EmptyL :'
+    p[0] = []
 
+def p_Empty(p):
+    'Empty :'
+    p[0] = None
 
-def tokenize(chars: str) -> list:
-    "Convert a string of characters into a list of tokens."
-    return chars.replace('(', ' ( ').replace(')', ' ) ').split()
-
-
-def parse(program: str) -> Expr:
-    "Read an S-expression from a string."
-    return read_from_tokens(tokenize(program))
-
-
-def read_from_tokens(tokens: list) -> Expr:
-    "Read an expression from a sequence of tokens."
-    if len(tokens) == 0:
-        raise SyntaxError('unexpected EOF')
-    token = tokens.pop(0)
-    if token == '(':
-        L = []
-        while tokens[0] != ')':
-            L.append(read_from_tokens(tokens))
-        tokens.pop(0)  # pop off ')'
-        return L
-    elif token == ')':
-        raise SyntaxError('unexpected )')
+def collect(p):
+    # collect a list of operators, as many()
+    if len(p) == 2:
+        p[0] = [p[1]]
     else:
-        return atom(token)
+        p[0] = p[1] + [p[2]]
 
+# parsers
+def p_Literal(p):
+    """
+    Literal : LIT_NUM
+            | LIT_HEX
+            | LIT_BOOL
+            | LIT_STRING
+    """
+    p[0] = p[1]
 
-def atom(token: str) -> Atom:
-    "Numbers become numbers; every other token is a symbol."
-    try:
-        return int(token)
-    except ValueError:
-        try:
-            return float(token)
-        except ValueError:
-            return Symbol(token)
+# Index and Identifier
+def p_Index(p):
+    """
+    Index : LIT_NUM
+          | SYMBOL
+    """
+    p[0] = p[1]
 
+def p_Indexs(p):
+    """
+    Indexs : Indexs Index
+           | Index
+    """
+    collect(p)
 
-def get_start(cmd) -> str:
-    assert (cmd[0] == "synth-fun")
-    return cmd[4][0]
+def p_Identifier(p):
+    """
+    Identifier : SYMBOL
+               | '(' '_' SYMBOL Indexs ')'
+    """
+    if len(p) == 2:
+        p[0] = Identifier(p[1])
+    else:
+        p[0] = Identifier(p[3], p[4])
 
+# Sort
+def p_Sort(p):
+    """
+    Sort : Identifier
+         | '(' Identifier Sorts ')'
+    """
+    if len(p) == 2:
+        p[0] = Sort(p[1])
+    else:
+        p[0] = Sort(p[2], p[3])
 
-def get_nonterminals(cmd):
-    nonterms = set()
-    type_dict = {}
-    assert (cmd[0] == "synth-fun")
-    for elem in cmd[4]:
-        nt = elem[0]
-        typ = elem[1]
-        nonterms.add(nt)
-        type_dict[nt] = typ
-    return (nonterms, type_dict)
+def p_Sorts(p):
+    """
+    Sorts : Sorts Sort
+          | Sort
+    """
+    collect(p)
 
+# Term
+def p_Term(p):
+    """
+    Term : Identifier
+         | Literal
+         | '(' Identifier Terms ')'
+         | '(' EXISTS '(' SortedVars ')' Term ')'
+         | '(' FORALL '(' SortedVars ')' Term ')'
+         | '(' LET '(' VarBindings ')' Term ')'
+    """
+    if len(p) == 2:
+        p[0] = Term(p[1])
+    elif len(p) == 5:
+        p[0] = Term(p[2], p[3])
+    else:
+        p[0] = Term(p[2], p[6], p[4])
 
-def get_terms_prods(cmd):
-    terminals = set()
-    productions = {}
-    for nonterm_list in cmd[5]:
-        non_term = nonterm_list[0]
-        product = []
-        for t in nonterm_list[2]:
-            # Non-terminals that go with a production
-            nts = []
+def p_Terms(p):
+    """
+    Terms : Terms Term
+          | Term
+    """
+    collect(p)
 
-            if isinstance(t, list):
-                # gets a terminal from the input, e.g., `"+"`
-                term = t[0]
-                # List of potential non-terminal children, e.g, `["I", "I"]` for `"+"`
-                nts += t[1:]
-            else:
-                term = t
+# parsed as tuple
+def p_SortedVar(p):
+    """
+    SortedVar : '(' SYMBOL Sort ')'
+    """
+    p[0] = (p[2], p[3])
 
-            if isinstance(term, list):
-                term = tuple(term)
-            terminals.add(term)
+def p_SortVars(p):
+    """
+    SortedVars : SortedVars SortedVar
+               | SortedVar
+    """
+    collect(p)
 
-            product.append((term, nts))
-        productions[non_term] = product
-    return terminals, productions
+def p_VarBinding(p):
+    """
+    VarBinding : '(' SYMBOL Term ')'
+    """
+    p[0] = (p[2], p[3])
 
-def get_grammar(input_str : str):
-    lines = input_to_list(input_str)
-    s_exprs = []
-    for line in lines:
-        s_exprs.append(parse(line))
-    for s in s_exprs:
-        if s[0] == "synth-fun":
-            start_sym = get_start(s)
-            nonterminals = get_nonterminals(s)
-            terminals, productions = get_terms_prods(s)
-            return nonterminals, terminals, productions, start_sym
+def p_VarBindings(p):
+    """
+    VarBindings : VarBindings VarBinding
+                | VarBinding
+    """
+    collect(p)
 
+# set feature not implemented
+def p_Cmd(p):
+    """
+    Cmd : '(' CHECK_SYNTH ')'
+        | '(' CONSTRAINT Term ')'
+        | '(' DECLARE_VAR SYMBOL Sort ')'
+        | '(' INV_CONSTRAINT SYMBOL SYMBOL SYMBOL SYMBOL ')'
+        | '(' SYNTH_FUN SYMBOL '(' SortedVars ')' Sort GrammarDefE ')'
+        | '(' SYNTH_INV SYMBOL '(' SortedVars ')' GrammarDefE ')'
+        | SmtCmd
+    """
+    if len(p) == 2:
+        p[0] = p[1]
+    else:
+        if   p[2] == 'check-synth':
+            p[0] = CheckSynthCmd()
+        elif p[2] == 'constraint':
+            p[0] = ConstraintCmd(p[3])
+        elif p[2] == 'declare-var':
+            p[0] =  DeclareVarCmd(p[3], p[4])
+        elif p[2] == 'inv-constraint': 
+            p[0] = InvConstraintCmd(p[3], p[4], p[5], p[6])
+        elif p[2] == 'synth-fun':
+            p[0] = SynthFunCmd(p[3], p[5], p[7], p[8])
+        elif p[2] == 'synth-inv':
+            p[0] = SynthInvCmd(p[3], p[5], p[7])
+
+def p_Cmds(p):
+    """
+    Cmds : Cmds Cmd
+         | Cmd
+    """
+    collect(p)
+
+def p_SmtCmd(p):
+    """
+    SmtCmd : '(' DECLARE_DATATYPE SYMBOL DTDec ')'
+           | '(' DECLARE_DATATYPES '(' SortDecls ')' '(' DTDecs ')'  ')'
+           | '(' DECLARE_SORT SYMBOL LIT_NUM ')'
+           | '(' DEFINE_FUN SYMBOL '(' SortedVarE ')' Sort Term ')'
+           | '(' SET_INFO ':' SYMBOL Literal ')'
+           | '(' SET_LOGIC SYMBOL ')'
+           | '(' SET_OPTION ':' SYMBOL Literal ')'
+    """
+    # TODO: assert error on datatypes line
+    p[0] = SmtCmd(p[1:])
+
+# rules for SmtCmd, for SMT inputs
+def p_SortDecl(p):
+    """
+    SortDecl : '(' SYMBOL LIT_NUM ')'
+    """
+    p[0] = (p[2], p[3])
+
+def p_SortDecls(p):
+    """
+    SortDecls : SortDecls SortDecl
+              | SortDecl
+    """
+    collect(p)
+
+def p_DTDec(p):
+    """
+    DTDec : '(' DTConsDecs ')'
+    """
+    p[0] = p[2]
+
+def p_DTDecs(p):
+    """
+    DTDecs : DTDecs DTDec
+           | DTDec
+    """
+    collect(p)
+
+def p_DTConsDec(p):
+    """
+    DTConsDec : '(' SYMBOL SortedVarE ')'
+    """
+    p[0] = (p[2], p[3])
+
+def p_SortedVarE(p):
+    """
+    SortedVarE : SortedVars
+               | EmptyL
+    """
+    p[0] = p[1]
+
+def p_DTConsDecs(p):
+    """
+    DTConsDecs : DTConsDecs DTConsDec
+               | DTConsDec
+    """
+    collect(p)
+
+def p_GrammarDef(p):
+    """
+    GrammarDef : '(' SortedVars ')' '(' GroupedRuleLists ')'
+    """
+    # TODO: assert error when size do not march
+    p[0] = (p[2], p[5])
+
+def p_GrammarDefE(p):
+    """
+    GrammarDefE : GrammarDef
+                | Empty
+    """
+    p[0] = p[1]
+
+def p_GroupedRuleList(p):
+    """
+    GroupedRuleList : '(' SYMBOL Sort '(' GTerms ')' ')'
+    """
+    p[0] = (p[2], p[3], p[5])
+
+def p_GroupedRuleLists(p):
+    """
+    GroupedRuleLists : GroupedRuleLists GroupedRuleList
+                     | GroupedRuleList
+    """
+    collect(p)
+
+def p_BfTerm(p):
+    """
+    BfTerm : Identifier
+           | Literal
+           | '(' Identifier BfTerms ')'
+    """
+    if len(p) == 2:
+        p[0] = GTerm(p[1])
+    else:
+        p[0] = GTerm(p[2], p[3])
+
+def p_BfTerms(p):
+    """
+    BfTerms : BfTerms BfTerm
+            | BfTerm
+    """
+    collect(p)
+
+def p_GTerm(p):
+    """
+    GTerm : '(' CONSTANT Sort ')'
+          | '(' VARIABLE Sort ')'
+          | BfTerm
+    """
+    if len(p) == 2:
+        p[0] = p[1]
+    else:
+        p[0] = GTerm(p[2], p[3])
+
+def p_GTerms(p):
+    """
+    GTerms : GTerms GTerm
+           | GTerm
+    """
+    collect(p)
+
+# Features do not implemented
+def p_Program(p):
+    """
+    Program : Cmds
+    """
+    p[0] = Program(p[1])
+
+# Parameters for ply
+def p_error(p):
+    print("Syntax error at {}".format(p.value))
+
+start = 'Program'
+
+# export 
+parser = yacc.yacc()

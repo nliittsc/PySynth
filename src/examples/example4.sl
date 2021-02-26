@@ -1,6 +1,6 @@
 (set-logic LIA)
-(set-feature :fwd-decls true)
-(set-feature :recursion true)
+; (set-feature :fwd-decls true)
+; (set-feature :recursion true)
 (define-fun x_plus_one ((x Int)) Int (+ x 1))
 (synth-fun f ((x Int)) Int
     ((I Int))

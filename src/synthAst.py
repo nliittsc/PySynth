@@ -187,29 +187,3 @@ class AST:
             for c in v.children:
                 stack.append(c)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
