@@ -100,6 +100,7 @@ def synthesize(max_iter: int, fun_dict, spec, var_decls):
     program.root = program.make_root()
     print(f"Starting program: {program.root.non_terminal}")
 
+    was_success: bool = False
     # Setting an iteration cap since there is no guarantee of termination yet
     for i in range(max_iter):
         (h, p) = decide(program, omega)
@@ -109,8 +110,8 @@ def synthesize(max_iter: int, fun_dict, spec, var_decls):
 
         #print("Previous program:")
         #prev_program.print_program()
-        print(f"Program on round {i + 1}:")
-        program.print_program()  # Just to check progress
+        #print(f"Program on round {i + 1}:")
+        #program.print_program()  # Just to check progress
 
         if is_not_empty(kappa):
             #print("Blocking current assignment and backtracking.")
@@ -120,18 +121,19 @@ def synthesize(max_iter: int, fun_dict, spec, var_decls):
             #print(omega)
             program = prev_program  # this is "backtracking"
             #print("Previous program:")
-            program.print_program()
+            #program.print_program()
             #program = backtrack(program, omega)
 
         if is_unsat(omega):
             print('*' * 10)
             print("Program Spec Cannot Be Satisified!")
             print('*' * 10)
-            return program
+            return program, was_success
         elif program.is_concrete():
+            was_success = True
             print('*' * 10)
             print("A valid program was found. Returning program.")
             print('*' * 10)
-            return program
+            return program, was_success
 
-    return program
+    return program, was_success

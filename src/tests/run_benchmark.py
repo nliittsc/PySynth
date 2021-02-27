@@ -44,7 +44,11 @@ for f in os.listdir(dir):
             spec.append(sem_constraint(c, problem['fun_dict'], fun_name))
         fun_dict = problem['fun_dict'][fun_name]
         var_decls = problem['var_decls']
-        program = synthesize(100, fun_dict, spec, var_decls)
-        program.print_program()
+        program, was_success = synthesize(25, fun_dict, spec, var_decls)
+        if was_success:
+            print("yay!")
+            program.print_program()
+        else:
+            print("Did not succeed")
 
 

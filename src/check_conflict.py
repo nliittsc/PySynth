@@ -19,9 +19,11 @@ def check_conflict(program : AST, spec):
     spec_p = [tup[0] for tup in spec_tups]
     #cores = []
     s = Solver()
+
     cores = s.unsat_core()
     for io_ex in spec:
         s.push()
+        #s.set("timeout", 10)
         s.add(io_ex)
         result = s.check(spec_p)
         if result == unsat:
