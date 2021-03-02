@@ -90,6 +90,7 @@ class AST:
         self.prods = fun_dict['grammar'][2]
         self.start_symbol = fun_dict['grammar'][3]
         self.return_type = fun_dict['fun_return_type']
+        self.prod_list = [item for sublist in self.prods.values() for item in sublist]
         self.root = None
         self.arity = None
 

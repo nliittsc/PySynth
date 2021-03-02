@@ -8,14 +8,17 @@ from src.ast import Node, AST
 def sem(symbol):
     ret_val_s = String("ret_val")  # the string returned by a subprogram
     ret_val_i = Int("ret_val")  # integer returned by sub-program
+    #ret_val_i = BitVec('ret_val', 16)
     ret_val_b = Bool("ret_val")
     s1 = String("s1")
     s2 = String("s2")
     s3 = String("s3")
 
+    #n1 = BitVec('n1', 16)
+    #n2 = BitVec('n2', 16)
     n1 = Int("n1")
     n2 = Int("n2")
-    #n3 = Int("n3")  # Not needed?
+    n3 = Int("n3")  # Not needed?
 
     # operators on strings/integers
     ops = ['str.++', 'str.replace', 'str.at', 'int.to.str', 'str.substr', 'str.len',
@@ -44,11 +47,14 @@ def sem(symbol):
             if symbol == 'str.at':  # returns a single character at a given index, starting from 0
                 return ret_val_s == SubString(s1, n1, 1)
             if symbol == 'int.to.str':
-                return ret_val_s == IntToStr(n1)
+                f = Function('int.to.str', IntSort(), StringSort())
+                #return And(ret_val_s == f(n1), n1 >= 0, n1 < 10000)
+                #return And(ret_val_s == IntToStr(n1), n1 > -1, n1 < 100)
+                #return ret_val_s == StringVal()
+                #return ret_val_s == If(n1 >= 0, IntToStr(n1), StringVal(""))
             if symbol == 'str.substr':  # return a substring of length n2, at offset n1
                 return ret_val_s == SubString(s1, n1, n2)
-
-
+                # (assert (= ret_val_s (substr s1 n1 n2)))
             # This section returns ints
             if symbol == '+':
                 return ret_val_i == n1 + n2
@@ -57,7 +63,7 @@ def sem(symbol):
             if symbol == 'str.len':
                 return ret_val_i == Length(s1)
             if symbol == 'str.to.int':
-                return ret_val_i == StrToInt(s1)
+                return And(ret_val_i == StrToInt(s1), Length(s1) < 100, Length(s1) > 0)
             if symbol == 'str.indexof':
                 return ret_val_i == IndexOf(s1, s2, n1)
 
@@ -190,18 +196,21 @@ def subst_sem(node: Node):
 # programs, but I suppose this can be converted to a loop
 def infer_spec_(r: Node):
     if r.num_children == 0:  # We have a leaf
-        return [subst_sem(r)]
+        return [subst_sem(r)], set([get_sym(r)])
     else:
+        vars = set()
         r_fmla = subst_sem(r)
         sub_fmlas = [r_fmla]
         for c in r.children:
-            sub_fmlas = sub_fmlas + infer_spec_(c)
-        return sub_fmlas  # List representing conjunction of all the children formulas
+            spec_c, sym_c = infer_spec_(c)
+            sub_fmlas = sub_fmlas + spec_c
+            vars = vars.union(sym_c)
+        return sub_fmlas , vars # List representing conjunction of all the children formulas
 
 def infer_spec(program: AST):
     r = program.root
     r_sym = get_sym(r)
-    spec = infer_spec_(r)
+    spec, vars = infer_spec_(r)
     # One last substitution, but this time change the root symbol to 'ret_val' which represents the return value
     if r_sym.sort() == IntSort():
         replacement_tup = (r_sym, Int('ret_val'))
@@ -220,5 +229,10 @@ def infer_spec(program: AST):
             t0 = substitute(t[0], replacement_tup)
             spec_p.append(tuple([t0, t[1], t[2], t[3]]))
 
-    return spec_p
+    return spec_p, vars
 
+
+# Helper for making the c(node.id, production) booleans used in a program encoding
+def mk_bool(n:int, p:str):
+    enc_str = f'c({n}, {p})'
+    return Bool(enc_str)
