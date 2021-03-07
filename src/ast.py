@@ -1,5 +1,6 @@
 from z3 import *
 from typing import Union, Tuple, Set
+from copy import deepcopy
 
 
 
@@ -36,9 +37,16 @@ class Node:
         self.children = []
         self.num_children = 0
 
+        #parent node
+        self.parent = None
+
+        #return type?
+        self.type = None
+
     # Checks if a given node is a hole or not. A node is a hole if it does not have a production rule applied.
     def is_hole(self) -> bool:
         if len(self.children) > 0 and self.terminal == None:
+            # this should never happen
             raise ValueError('Node has children, but no production rule!')
         return self.terminal == None
 
@@ -58,7 +66,6 @@ class Node:
             node = Node(syms[i])
             self.children.append(node)
         self.num_children = n
-        return self
 
     # returns a symbolic variable (compatible with python's Z3 api) that encodes the node as a boolean
     def encode_node(self):
@@ -77,7 +84,7 @@ def label(k: int, d:int, i: int) -> int:
 
 
 
-# This AST class represents a partial or complete program. One should pass a 4-tuple representing a grammar G
+# This AST class represents a partial or complete program.
 class AST:
     def __init__(self, fun_dict):
         #self.grammar = grammar
@@ -93,6 +100,7 @@ class AST:
         self.prod_list = [item for sublist in self.prods.values() for item in sublist]
         self.root = None
         self.arity = None
+        self.input_dict = {v: 'x' + str(i + 1) for (i, v) in enumerate(self.inputs)}
 
         # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
         self.num_at_depth = {}
@@ -113,9 +121,9 @@ class AST:
         r.d = 1
         r.k = k
         r.i = 1
+        #r.type = self.type_dict[self.start_symbol]
         self.root = r
         self.num_at_depth[1] = 1
-        return r
 
     # Returns a set of holes (nodes) starting at the root or some given node
     def holes(self, r : Node = None) -> Set[Node]:
@@ -126,64 +134,43 @@ class AST:
         while stack:
             v = stack.pop()
             if v.is_hole():
-                holes.add(v)
+                holes.add(deepcopy(v))
             for c in v.children:
                 stack.append(c)
         return holes
 
-    # DFS search for the tree, to find a node with the matching ID, initialized to root if not passed
-    def search(self, id: int, r: Node = None) -> Node:
-        if r is None:
-            r = self.root
-        stack = [r]
-        while stack:
-            v = stack.pop()
-            if v.id == id:
-                return v
+    # Iterative BFS procedure
+    def fill(self, id: int, p: Production):
+        queue = [self.root]
+        while queue:
+            v = queue.pop(0)
+            if v.id == id:  # found target node, fill with productions and annotate
+                assert(v.is_hole() is True)
+                v.apply_prod(p)
+                d = v.d
+                k = v.k
+                if d+1 not in self.num_at_depth.keys(): # reached new depth level
+                    # annotate the children
+                    self.num_at_depth[d+1] = v.num_children
+                    for (i, c) in enumerate(v.children):
+                        c.id = label(k, d+1, i+1)
+                        c.d = d + 1
+                        c.k = k
+                else:  # need to update the current depth level with num new children
+                    m = self.num_at_depth[d+1]
+                    if v.num_children > 0:
+                        self.num_at_depth[d + 1] += v.num_children
+                        for (i, c) in enumerate(v.children):
+                            c.id = label(k, d + 1, i + m + 1)
+                            c.d = d + 1
+                            c.k = k
+            # target not reached, continue traversal
             else:
                 for c in v.children:
-                    stack.append(c)
+                    queue.append(c)
 
-    # Helper to fill a given hole with a given production
-    def fill(self, node: Node, id: int, p: Production):
-        if node.id == id:
-            node = node.apply_prod(p)
 
-            # Update the labels of the children nodes, making sure each node has a unique label
-            # Also update the number of ndoes at depth d+1, after the production is applied
-            d: int = node.d
-            k: int = node.k
-            if d+1 not in self.num_at_depth.keys():  # Create a new mapping
-                self.num_at_depth[d+1] = node.num_children
-                labeled_children = []
-                if node.num_children > 0:
-                    for (i, c) in enumerate(node.children):
-                        c.id = label(k, d+1, i+1)
-                        c.d = d+1
-                        c.k = k
-                        c.i = i+1
-                        labeled_children.append(c)
 
-            else:
-                m: int = self.num_at_depth[d+1]
-                self.num_at_depth[d+1] += node.num_children
-                labeled_children = []
-                if node.num_children > 0:
-                    for (i, c) in enumerate(node.children):
-                        c.id = label(k, d+1, i+m+1)
-                        c.d = d+1
-                        c.k = k
-                        labeled_children.append(c)
-
-            node.children = labeled_children
-            return node
-        elif node.num_children == 0:
-            return node
-        else:
-            new_children = [self.fill(c, id, p) for c in node.children]
-            node.children = new_children
-
-            return node
 
     # Checks if a program has all its holes filled, and is thus a full program
     def is_concrete(self):
@@ -226,7 +213,7 @@ class AST:
 
 
     # Can work on this more later
-    def print_program(self):
+    def print(self):
         program = self.to_program()
         #print(p)
         print(program)

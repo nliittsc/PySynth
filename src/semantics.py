@@ -45,16 +45,11 @@ def sem(symbol):
             if symbol == 'str.replace':  # replace first occur of x2 by x3 in string x1
                 return ret_val_s == Replace(s1, s2, s3)
             if symbol == 'str.at':  # returns a single character at a given index, starting from 0
-                return ret_val_s == SubString(s1, n1, 1)
+                return (ret_val_s == SubString(s1, n1, 1), n1 >= 0, n1 < Length(s1))
             if symbol == 'int.to.str':
-                f = Function('int.to.str', IntSort(), StringSort())
-                #return And(ret_val_s == f(n1), n1 >= 0, n1 < 10000)
-                #return And(ret_val_s == IntToStr(n1), n1 > -1, n1 < 100)
-                #return ret_val_s == StringVal()
-                #return ret_val_s == If(n1 >= 0, IntToStr(n1), StringVal(""))
+               return ret_val_s == IntToStr(n1)
             if symbol == 'str.substr':  # return a substring of length n2, at offset n1
-                return ret_val_s == SubString(s1, n1, n2)
-                # (assert (= ret_val_s (substr s1 n1 n2)))
+                return And(ret_val_s == SubString(s1, n1, n2), n2 > 0, n1 < Length(s1))
             # This section returns ints
             if symbol == '+':
                 return ret_val_i == n1 + n2
@@ -65,8 +60,8 @@ def sem(symbol):
             if symbol == 'str.to.int':
                 return And(ret_val_i == StrToInt(s1), Length(s1) < 100, Length(s1) > 0)
             if symbol == 'str.indexof':
+                #return And(ret_val_i == IndexOf(s1, s2, n1), Contains(s1, s2), Length(s2) <= Length(s1))
                 return ret_val_i == IndexOf(s1, s2, n1)
-
             # This section returns bools
             if symbol == 'str.prefixof':
                 return ret_val_b == PrefixOf(s1, s2)

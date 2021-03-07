@@ -1,46 +1,89 @@
 from z3 import *
 from src.ast import Node, AST, label
-from src.semantics import infer_spec
+from src.semantics_v2 import infer_spec
 
-# dummy tests on the following constraints:
-#(constraint (= (f "Nancy" "FreeHafer") "Nancy FreeHafer"))
-#(constraint (= (f "Andrew" "Cencici") "Andrew Cencici"))
-#(constraint (= (f "Jan" "Kotas") "Jan Kotas"))
-#(constraint (= (f "Mariya" "Sergienko") "Mariya Sergienko"))
+# Connects the output example with the program output
+connectors = [Int('o.len') == Int('o1.len'),
+              Int('o.head') == Int('o1.head'),
+              Int('o.last') == Int('o1.last')]
+
+# Generates a special SMT formula that maps string holes in the partial program
+# to *some* possible input. Described in terms of length, and the first/last ascii
+# characters
+def plug_holes(holes, abstr_map):
+    smt_to_plug_holes = []
+    for h, nt in holes:
+        if nt == 'ntString':
+            h_len = Int('o' + str(h) + '.len')
+            h_head = Int('o' + str(h) + '.head')
+            h_last = Int('o' + str(h) + '.last')
+            or_fmla = []
+            for xi, _ in abstr_map['raw_inputs']:
+                xi_len = Int(xi + '.len')
+                xi_head = Int(xi + '.head')
+                xi_last = Int(xi + '.last')
+                f = And([h_len == xi_len, h_head == xi_head, h_last == xi_last])
+
+                or_fmla.append(f)
+            or_fmla = Or(or_fmla)
+            #print(or_fmla)
+            smt_to_plug_holes.append(or_fmla)
+    return And(smt_to_plug_holes)
+
+# Every input *must* appear in some node.
+def force_input_appear(holes, abstr_map):
+    smt_fmla = []
+    for xi, _ in abstr_map['raw_inputs']:
+        xi_len = Int(xi + '.len')
+        xi_head = Int(xi + '.head')
+        xi_last = Int(xi + '.last')
+        or_fmla = []
+        for h, nt in holes:
+            if nt == 'ntString':
+                h_len = Int('o' + str(h) + '.len')
+                h_head = Int('o' + str(h) + '.head')
+                h_last = Int('o' + str(h) + '.last')
+                f = And([h_len == xi_len, h_head == xi_head, h_last == xi_last])
+                or_fmla.append(f)
+        smt_fmla.append(Or(or_fmla))
+    return Or(smt_fmla)
 
 
 
-def check_conflict(program : AST, spec, ):
-    spec_tups, free_vars = infer_spec(program)  # Gets the program spec. \Phi_P in the paper
 
-    spec_p = [tup[0] for tup in spec_tups if not isinstance(tup[0], bool)]
+
+def check_conflict(program : AST, constraints):
+    spec_tuple = infer_spec(program.root)
+    # flatten list of specs
+    program_spec = [f for node_spec in spec_tuple for f in node_spec[0]]
+    print("CHECKING PROGRAM:")
+    program.print()
+    holes = [(t[2], t[4]) for t in spec_tuple if t[3] is None]
+    #print(holes)
     s = Solver()
-    #s.set("smt.string_solver", "z3str3")
-    cores = s.unsat_core()
-    inputs = program.inputs
-    #s.add(spec_p)
-    for io in spec:
-        s.push()
-        enc = And(spec_p + io)
-        spec = enc
-        s.add(spec)
+    s.add(program_spec)
+    s.add(connectors)
+    # each abstraction map is *some* IO example
+    for abstr_map in constraints:
+        s.push()  # new state
+        s.add(plug_holes(holes, abstr_map))
+        #s.add(force_input_appear(holes, abstr_map))
+        s.add(abstr_map['sym_inputs'])
+        s.add(abstr_map['sym_outputs'])
         result = s.check()
-
         if result == unsat:
-            s.pop()
-            s.add(io)
-            s.check(spec_p)
-            core = s.unsat_core()
-            # post process the core as in the paper
-            #print(core)
-            muc = [(tup[1], tup[2], tup[3]) for f in core
-                   for tup in spec_tups if f == tup[0]]
-            print("core found:")
-            print(muc)
-            return set(muc)
-        elif result == sat or result == unknown:
-            s.pop()
+            print("UNSAT")
+            s_ = Solver()  # fresh solver to retrieve the unsat core
+            enc = program_spec + connectors
+            enc += abstr_map['sym_inputs'] + abstr_map['sym_outputs']
+            s_.check(enc)
+            print(s_.unsat_core())
+            return [1]  # indicates an "unsat"
+        else:
+            print("MODEL")
+            #print(s.model())
+            s.pop()  # continue
 
-    return set()
+    return [] # termination implies spec is OK.
 
 
