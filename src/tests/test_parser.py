@@ -112,12 +112,12 @@ def test_bikes():
     # test grammar
     grammar = fun_dict[fun_name1][GRAMMAR]
     assert set(grammar[0]) == {'ntString', 'ntInt', 'ntBool'}  # nonterminals
-    assert set(grammar[1]) == {'name', ' ', 'str.++', 'str.replace', 'str.at', 'int.to.str', 'str.substr', 0, 1, 2, 3,
+    assert set(grammar[1]) == {'name', '" "', 'str.++', 'str.replace', 'str.at', 'int.to.str', 'str.substr', 0, 1, 2, 3,
                                4, 5, '+', '-', 'str.len', 'str.to.int', 'str.indexof', 'true', 'false', 'str.prefixof',
                                'str.suffixof', 'str.contains'}  # terminals
     # productions
     assert set(make_hashable(grammar[2]['ntString'])) == set(make_hashable(
-        [("name", ()), (' ', ()), ("str.++", ("ntString", "ntString")),
+        [("name", ()), ('" "', ()), ("str.++", ("ntString", "ntString")),
          ("str.replace", ('ntString', 'ntString', 'ntString')), ('str.at', ('ntString', 'ntInt')),
          ('int.to.str', ('ntInt',)),
          ('str.substr', ('ntString', 'ntInt', 'ntInt'))]))
@@ -158,12 +158,12 @@ def test_initials():
     # test grammar
     grammar = fun_dict[fun_name1][GRAMMAR]
     assert set(grammar[0]) == {'ntString', 'ntInt', 'ntBool'}  # nonterminals
-    assert set(grammar[1]) == {'name', ' ', '.', 'str.++', 'str.replace', 'str.at', 'int.to.str', 'str.substr', 0, 1, 2,
+    assert set(grammar[1]) == {'name', '" "', '.', 'str.++', 'str.replace', 'str.at', 'int.to.str', 'str.substr', 0, 1, 2,
                                '+', '-', 'str.len', 'str.to.int', 'str.indexof', 'true', 'false', 'str.prefixof',
                                'str.suffixof', 'str.contains'}  # terminals
     # productions
     assert set(make_hashable(grammar[2]['ntString'])) == set(make_hashable(
-        [("name", ()), (' ', ()), ('.', ()), ("str.++", ("ntString", "ntString")),
+        [("name", ()), ('" "', ()), ('.', ()), ("str.++", ("ntString", "ntString")),
          ("str.replace", ('ntString', 'ntString', 'ntString')), ('str.at', ('ntString', 'ntInt')),
          ('int.to.str', ('ntInt',)),
          ('str.substr', ('ntString', 'ntInt', 'ntInt'))]))
