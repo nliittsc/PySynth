@@ -1,15 +1,16 @@
 from z3 import *
 from src.parser import input_to_list, parse, get_grammar, parse_sygus
-from src.synthesizer import *
+#from src.synthesizer import *
+from src.synthesizer_dfs import *
 from src.semantics import *
 from src.semantics_v2 import *
 
-dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\PBE_Strings_2018_comp'
+dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\benchmark_subset'
 num_success = 0
 i = 0
 for f in os.listdir(dir):
     i += 1
-    if i > 1:
+    if i > 5:
         break
     path = os.path.join(dir, f)
     print('-' * 5)
@@ -48,13 +49,13 @@ for f in os.listdir(dir):
             print(problem['fun_dict'][fun_name]['type_dict'])
 
             #print('@***@')
-            print("Constraints:")
-            print(problem['constraints'])
+            #print("Constraints:")
+            #print(problem['constraints'])
             spec = []
             fun_dict = problem['fun_dict'][fun_name]
             for c in problem['constraints']:
                 spec.append(abstract_constraint(c, fun_name, fun_dict))
-            print(spec)
+            #print(spec)
             var_decls = problem['var_decls']
             was_success = False
             program, was_success = synthesize(5, fun_dict, spec, var_decls)

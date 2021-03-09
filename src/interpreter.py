@@ -14,13 +14,40 @@ def recur_descent(sexpr):
     elif isinstance(sexpr, list):
         f = sexpr[0]
         if f == 'str.++':
-            s = recur_descent(sexpr[1][0]) + ' + ' + recur_descent(sexpr[1][1])
+            s = '(' + recur_descent(sexpr[1][0]) + ' + ' + recur_descent(sexpr[1][1]) + ')'
             return s
         if f == 'str.substr':
             string = recur_descent(sexpr[1][0])
             start = recur_descent(sexpr[1][1])
             count = recur_descent(sexpr[1][2])
-            s = string + '[' + start + ':' + start + '+' + count + ']'
+            s = string + '[' + start + ' : ' + start + ' + ' + count + ']'
+            return s
+        if f == 'str.indexof':
+            string = recur_descent(sexpr[1][0])
+            substring = recur_descent(sexpr[1][1])
+            n = recur_descent(sexpr[1][2])
+            s = string + '[' + n + ':].find(' + substring + ') + ' + n
+            return s
+
+        if f == 'str.at':
+            string = recur_descent(sexpr[1][0])
+            n = recur_descent(sexpr[1][1])
+            s = string + '[' + n + ']'
+            return s
+
+        if f == 'str.len':
+            string = recur_descent(sexpr[1][0])
+            s = 'len(' + string + ')'
+            return s
+        if f == '+':
+            lexpr = recur_descent(sexpr[1][0])
+            rexpr = recur_descent(sexpr[1][1])
+            s = '(' + lexpr + ' + ' + rexpr + ')'
+            return s
+        if f == '-':
+            lexpr = recur_descent(sexpr[1][0])
+            rexpr = recur_descent(sexpr[1][1])
+            s = '(' + lexpr + ' - ' + rexpr + ')'
             return s
 
 # Converts a program into a python string that can actually be executed
@@ -28,6 +55,7 @@ def interpreter(program: AST, constraints):
     prog_sexpr = program.to_program()
     print("PROGRAM SEXPR")
     print(prog_sexpr)
+    print("PROGRAM INPUTS:")
     print(program.inputs)
     py_str = 'def f('
     for xi in program.inputs:
@@ -50,12 +78,14 @@ def interpreter(program: AST, constraints):
             py_str += '"' + string + '"'
 
         py_str += '\n'
-        py_str += f'print("Test {str(i)} passed: ")\n'
-        py_str += 'print(b)\n'
+        py_str += f'print("Test {str(i)}: " + str(b))\n'
+        #py_str += 'print(b)\n'
         py_str += 'passed_tests += b\n'
 
     py_str += 'if num_tests == passed_tests:\n  '
     py_str += 'verified = True\n'
+    py_str += 'else:\n  '
+    py_str += 'verified = False'
     #print("PYTHON STRING")
     #print(py_str)
     result = {}

@@ -27,6 +27,7 @@ def input_to_list(string: str) -> [str]:
 def tokenize(chars: str) -> list:
     "Convert a string of characters into a list of tokens."
     new_chars = chars.replace('(', ' ( ').replace(')', ' ) ')
+    new_chars = new_chars.replace('\t', ' ')
     # custom split method because I don't know how to use regex lol
     # This is to correctly parse '" " "Dr." "a""b"' to ['" "', '"Dr."', '"a"b"'].
     # quotes will be used to check string literals, and dropped later
@@ -49,8 +50,8 @@ def tokenize(chars: str) -> list:
             s += c
         else:
             s += c
-
-    return [t.replace('""', '"') for t in tokens]  # following the language spec
+    return [t.replace('\t', '') for t in tokens]
+    #return [t.replace('""', '"') for t in tokens]  # following the language spec
 
 
 def parse(program: str) -> Expr:

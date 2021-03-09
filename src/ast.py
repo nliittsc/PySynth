@@ -27,7 +27,6 @@ class Node:
 
         #self.id = label(k, d, i)    # We should probably do this during fill
         # Just some aliases for the non-terminal
-        self.A = symbol
         self.non_terminal = symbol
 
         # Just some aliases for the terminal symbol/operator
@@ -43,12 +42,23 @@ class Node:
         #return type?
         self.type = None
 
+        # denotes a valid set of production rules for this node
+        self.valid_rules = None
+
+        # decision level. Used for backtracking
+        self.d_level = -1
+
     # Checks if a given node is a hole or not. A node is a hole if it does not have a production rule applied.
     def is_hole(self) -> bool:
         if len(self.children) > 0 and self.terminal == None:
             # this should never happen
             raise ValueError('Node has children, but no production rule!')
         return self.terminal == None
+
+    # assumes we have a dictionary
+    def update_valid_rules(self, product_map):
+        rules = product_map[self.non_terminal]
+        self.valid_rules = rules
 
     def print(self):
         print(f"id: {self.id}")
@@ -58,10 +68,12 @@ class Node:
         print(f"production applied: {self.terminal} -> {[c.non_terminal for c in self.children]}")
 
     # Helper that applies a production rule to a node.
-    def apply_prod(self, p: Production):
+    def apply_prod(self, p: Production, d_level: int = -1):
         self.terminal = p[0]
         syms = p[1]
         n: int = len(p[1])
+        self.d_level = d_level
+        self.children = []  # remove old children
         for i in range(n):
             node = Node(syms[i])
             self.children.append(node)
@@ -105,6 +117,16 @@ class AST:
         # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
         self.num_at_depth = {}
 
+        # Replacing searches with explicit lookups. Should be more efficient.
+        self.graph = dict()  # adjacency list type representation. Holds a node at each key
+        self.leaves = set()  # holds ids of leaf nodes (which might be holes)
+        self.internal_nodes = set()  # holds ids of non-leaf nodes
+        self.holes = set()  # only holds ids of holes
+
+        # Represents a 'trail' (list) of nodes that have currently been traversed
+        # Used for backtracking efficiently
+        self.trail = []
+
     # Computes the maximum arity of the grammar operators
     def max_arity(self) -> int:
         arities = []
@@ -124,58 +146,117 @@ class AST:
         #r.type = self.type_dict[self.start_symbol]
         self.root = r
         self.num_at_depth[1] = 1
+        self.graph[r.id] = r
+        self.leaves.add(r.id)
+        self.holes.add(r.id)
 
-    # Returns a set of holes (nodes) starting at the root or some given node
-    def holes(self, r : Node = None) -> Set[Node]:
-        if r is None:
-            r = self.root
-        holes = set()
-        stack = [r]
-        while stack:
-            v = stack.pop()
-            if v.is_hole():
-                holes.add(deepcopy(v))
-            for c in v.children:
-                stack.append(c)
-        return holes
 
-    # Iterative BFS procedure
-    def fill(self, id: int, p: Production):
-        queue = [self.root]
-        while queue:
-            v = queue.pop(0)
-            if v.id == id:  # found target node, fill with productions and annotate
-                assert(v.is_hole() is True)
-                v.apply_prod(p)
-                d = v.d
-                k = v.k
-                if d+1 not in self.num_at_depth.keys(): # reached new depth level
-                    # annotate the children
-                    self.num_at_depth[d+1] = v.num_children
-                    for (i, c) in enumerate(v.children):
-                        c.id = label(k, d+1, i+1)
-                        c.d = d + 1
-                        c.k = k
-                else:  # need to update the current depth level with num new children
-                    m = self.num_at_depth[d+1]
-                    if v.num_children > 0:
-                        self.num_at_depth[d + 1] += v.num_children
-                        for (i, c) in enumerate(v.children):
-                            c.id = label(k, d + 1, i + m + 1)
-                            c.d = d + 1
-                            c.k = k
-            # target not reached, continue traversal
-            else:
-                for c in v.children:
-                    queue.append(c)
+
+    # Returns a set of holes (nodes) currently maintained in the partial program
+    # note: default is to return a deep copy of the nodes
+    def get_holes(self, return_copy: Bool = True) -> list[Node]:
+        holes = [v for k, v in self.graph.items() if k in self.holes]
+        if return_copy:
+            return (deepcopy(holes))
+        else:
+            return holes
+
+        # if r is None:
+        #     r = self.root
+        # holes = []
+        # stack = [r]
+        # while stack:
+        #     v = stack.pop()
+        #     if v.is_hole():
+        #         holes.append(deepcopy(v))
+        #     for c in v.children:
+        #         stack.append(c)
+        # return holes
+
+    # note: default is to return a deep copy of the target node
+    def search(self, id: int, return_copy: bool=True):
+        if return_copy:
+            return deepcopy(self.graph[id])
+        else:
+            return self.graph[id]
+
+    # Fills the target node with a production, spawning children.
+    # Also will maintain the set of leaves/internals/holes/adj.list
+    def fill(self, id: int, p: Production, d_level):
+        v = self.graph[id]
+        assert(v.is_hole() is True)
+        v.apply_prod(p, d_level)  # mutate v
+        # Maintain invariants
+        self.holes.remove(v.id)  # v is no longer a hole
+        if v.num_children <= 0:
+            self.leaves.remove(v.id)
+        else:  # v has children and thus has become an internal node
+            self.internal_nodes.add(v.id)
+            if v.d + 1 not in self.num_at_depth.keys():  # reached new depth level
+                self.num_at_depth[v.d + 1] = v.num_children
+                for (i, c) in enumerate(v.children):
+                    c.id = label(v.k, v.d+1, i+1)
+                    c.d = v.d + 1
+                    c.k = v.k
+                    self.graph[c.id] = c
+                    self.holes.add(c.id)
+                    self.leaves.add(c.id)
+            else:  # need to update the current depth level with num new children
+                m = self.num_at_depth[v.d+1]
+                self.num_at_depth[v.d + 1] += v.num_children
+                for (i, c) in enumerate(v.children):
+                    c.id = label(v.k, v.d + 1, i + m + 1)
+                    c.d = v.d + 1
+                    c.k = v.k
+                    self.graph[c.id] = c
+                    self.holes.add(c.id)
+                    self.leaves.add(c.id)
+        # making sure graph is maintained
+        self.graph[id] = v
+
+
+
+
+        # queue = [self.root]
+        # while queue:
+        #
+        #     v = queue.pop(0)
+        #     if v.id == id:  # found target node, fill with productions and annotate
+        #         assert(v.is_hole() is True)
+        #         v.apply_prod(p, d_level)
+        #         d = v.d
+        #         k = v.k
+        #         if d+1 not in self.num_at_depth.keys(): # reached new depth level
+        #             # annotate the children
+        #             self.num_at_depth[d+1] = v.num_children
+        #             for (i, c) in enumerate(v.children):
+        #                 c.id = label(k, d+1, i+1)
+        #                 c.d = d + 1
+        #                 c.k = k
+        #                 self.adj_list[c.id] = []
+        #         else:  # need to update the current depth level with num new children
+        #             m = self.num_at_depth[d+1]
+        #             if v.num_children > 0:
+        #                 self.num_at_depth[d + 1] += v.num_children
+        #                 for (i, c) in enumerate(v.children):
+        #                     c.id = label(k, d + 1, i + m + 1)
+        #                     c.d = d + 1
+        #                     c.k = k
+        #                     self.adj_list[c.id] = []
+        #         # copy the children for adjacency list stuff
+        #         self.adj_list[v.id] = v.children
+        #     # target not reached, continue traversal
+        #     else:
+        #         for c in v.children:
+        #             queue.append(c)
 
 
 
 
     # Checks if a program has all its holes filled, and is thus a full program
     def is_concrete(self):
-        holes = self.holes()
-        return len(holes) == 0
+        #holes = self.holes()
+        return len(self.holes) == 0
 
     # Returns the partial program as a SAT formula that is compatible with python's Z3 API
     def encode(self):

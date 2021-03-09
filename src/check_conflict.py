@@ -56,34 +56,30 @@ def check_conflict(program : AST, constraints):
     spec_tuple = infer_spec(program.root)
     # flatten list of specs
     program_spec = [f for node_spec in spec_tuple for f in node_spec[0]]
-    print("CHECKING PROGRAM:")
-    program.print()
-    holes = [(t[2], t[4]) for t in spec_tuple if t[3] is None]
-    #print(holes)
     s = Solver()
     s.add(program_spec)
     s.add(connectors)
     # each abstraction map is *some* IO example
     for abstr_map in constraints:
         s.push()  # new state
-        s.add(plug_holes(holes, abstr_map))
+        #s.add(plug_holes(holes, abstr_map))
         #s.add(force_input_appear(holes, abstr_map))
         s.add(abstr_map['sym_inputs'])
         s.add(abstr_map['sym_outputs'])
         result = s.check()
         if result == unsat:
-            print("UNSAT")
+            #print("UNSAT")
             s_ = Solver()  # fresh solver to retrieve the unsat core
             enc = program_spec + connectors
             enc += abstr_map['sym_inputs'] + abstr_map['sym_outputs']
             s_.check(enc)
-            print(s_.unsat_core())
-            return [1]  # indicates an "unsat"
+            return [f for f in s_.unsat_core()], spec_tuple  # indicates an "unsat"
         else:
-            print("MODEL")
+            #print("MODEL")
+            #print(s)
             #print(s.model())
             s.pop()  # continue
-
-    return [] # termination implies spec is OK.
+    #print("FEASIBLE")
+    return [], spec_tuple # termination implies spec is OK.
 
 
