@@ -6,12 +6,6 @@ import numpy as np
 
 
 
-
-# Helper to encode a production rule application
-def encode_hp(h, p):
-    return Bool(f'c({h.id}, {p[0]})')
-
-
 # Dummy functions for now. Corresponds to checking if fill(P, H, p) ~ Omega in the paper.
 # This is called "checking consistency". Omega is a set of z3 compatible lemmas.
 def is_consistent(ast, hole, knowledge_base, d_level):
@@ -20,17 +14,11 @@ def is_consistent(ast, hole, knowledge_base, d_level):
     prog = deepcopy(ast)  # Not sure if needed, but doing this to avoid weird mutability problems
     h = deepcopy(hole[0])
     p = hole[1]
-    #print(p)
-    if len(p[1]) > 0 and p[0] not in implemented_grammar:
-        return False
     prog.fill(h.id, p, d_level)
     encoded_program = prog.encode()  # Get the encoding of the program
-    #print(encoded_program)
-    #print(knowledge_base)
     sat_problem = encoded_program + knowledge_base  # Should be a conjunction of symbolic booleans
-    #print(sat_problem)
     solver = Solver()
-    solver.add(sat_problem)
+    solver.add(And(sat_problem))
     result = solver.check()  # Will be 'sat' or 'unsat'
     return result == sat
 
@@ -71,51 +59,7 @@ def decide(program, holes, knowledge_base: list, watched, d_level):
     #print(f"picked hole: ({picked_hole[0].id}, {picked_hole[1][0]})")
     return picked_hole, False
 
-# Dummy function of the PROPOGATE routine. Currently just fills the hole.
-def propogate(program: AST, hole, knowledge_base, d_level):
-    h = hole[0]
-    production = hole[1]
-    program.fill(h.id, production, d_level)
-    # We force substring productions to only have integer holes
-    # This is an attempt to limit expressivity
-    if production[0] == 'str.substr':
-        print("FILLING SUBSTRING HOLE")
-        v = program.search(h.id)
-        u = deepcopy(v.children[0])
-        assert(u.non_terminal == 'ntString')  # should always be true
-        # should always have terminals with no children
-        valid_choices = [p for p in program.prods[u.non_terminal] if not p[1]]
-        idx = np.random.choice(range(len(valid_choices)))
-        production = valid_choices[idx]
-        program.fill(u.id, production, d_level)
 
-    else:
-        holes = program.get_holes()
-        prods = program.prods
-        cross_product = [(h, p) for h in holes
-                         for p in prods[h.non_terminal]]
-
-        s = Solver()
-        for hi, pi in cross_product:
-            s.push()
-            valid_rules = [p for p in prods[hi.non_terminal]]
-            possible_fills = [encode_hp(hi, p) for p in valid_rules]
-            prog_enc = program.encode()
-            f1 = And(knowledge_base)
-            f2 = Or(possible_fills)
-            f3 = And(prog_enc)
-            p = simplify(And([f1, f2, f3]))
-            q = encode_hp(hi, pi)
-            p_implies_q = Implies(p, q)
-            # checking validity = Not(p Implies q) is UNSAT
-            s.add(Not(p_implies_q))
-            result = s.check()
-            if result == unsat:  # if valid, propogate
-                print("PROPOGATING")
-                program.print()
-                h_ = deepcopy(hi)
-                propogate(program, (h_, pi), knowledge_base, d_level)
-            s.pop()
 
 
 

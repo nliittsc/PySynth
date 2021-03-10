@@ -25,6 +25,8 @@ class Node:
         if i is None:
             self.i = 0
 
+        self.id = -1
+
         #self.id = label(k, d, i)    # We should probably do this during fill
         # Just some aliases for the non-terminal
         self.non_terminal = symbol
@@ -76,8 +78,10 @@ class Node:
         self.children = []  # remove old children
         for i in range(n):
             node = Node(syms[i])
+            node.parent = self.id
             self.children.append(node)
         self.num_children = n
+
 
     # returns a symbolic variable (compatible with python's Z3 api) that encodes the node as a boolean
     def encode_node(self):
@@ -85,7 +89,7 @@ class Node:
             raise ValueError(f"No production assigned to node {self.id}")
         c = f"c({self.id}, {self.terminal})"
         return Bool(c)
-
+        #return encode(self, self.)
 
 
 
@@ -116,6 +120,7 @@ class AST:
 
         # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
         self.num_at_depth = {}
+        self.node_at_depth = {}
 
         # Replacing searches with explicit lookups. Should be more efficient.
         self.graph = dict()  # adjacency list type representation. Holds a node at each key
@@ -146,7 +151,7 @@ class AST:
         #r.type = self.type_dict[self.start_symbol]
         self.root = r
         self.num_at_depth[1] = 1
-        self.graph[r.id] = r
+        self.graph[r.id] = self.root
         self.leaves.add(r.id)
         self.holes.add(r.id)
 
@@ -175,42 +180,110 @@ class AST:
 
     # note: default is to return a deep copy of the target node
     def search(self, id: int, return_copy: bool=True):
+        #print("SEARCHING")
+        #print(id)
         if return_copy:
             return deepcopy(self.graph[id])
         else:
             return self.graph[id]
 
+    def relabel_(self):
+        r = self.root
+        k = r.k
+        queue = [r]
+        self.num_at_depth[1] = 0  # maintain invariant
+        old_d = 0
+        highest_depth = 0
+        while queue:
+            v = queue.pop(0)
+            new_d = v.d
+            self.num_at_depth[v.d] += 1
+            if old_d < new_d:
+                i = 1
+                highest_depth = new_d
+            for w in v.children:
+                w.d = v.d + 1
+                w.i = i
+                w.k = k
+                old_id = w.id
+                w.id = label(w.k, w.d, w.i)
+                #print(f"NEW LABEL {w.id}")
+                #print(f"NEW ID {old_id}")
+                self.graph[w.id] = self.graph[old_id]
+                queue.append(w)
+                i += 1
+            old_d = new_d
+        for k, v in self.num_at_depth.items():
+            if k <= highest_depth:
+                self.num_at_depth[k] = v
+            else:
+                self.num_at_depth[k] = 0
+        #print("REBALANCED DEPTHS")
+        #print(self.num_at_depth)
+        #print("HIGHEST DEPTH")
+        #print(highest_depth)
+
+
+
+
+
+
+    # given a node id, deletes the node, all its children, and rebalances AST
+    # Note, id node is replaced with a hole, to maintain AST invariant
+    def delete_(self, id: int):
+        u = self.search(id, return_copy=False)
+        #print(f"DELETING NODE {u.id}")
+        queue = [u]
+        ids_to_delete = []
+        # make deletions
+        while queue:
+            v = queue.pop(0)
+            self.num_at_depth[v.d] -= 1
+            if v.is_hole():
+                self.holes.discard(v.id)
+            for w in v.children:
+                ids_to_delete.append(w.id)
+                queue.append(w)
+        # Remove all descendants
+        #print("REMOVED IDS")
+        #print(ids_to_delete)
+        #for node_id in ids_to_delete:
+        #    del self.graph[node_id]
+        u.terminal = None
+        u.children = []
+        u.num_children = 0
+        self.relabel_()
+        self.holes.add(u.id)
+        self.graph[u.id] = u
+        #print("NODES AT DEPTHs")
+        #print(self.num_at_depth)
+
+
+
     # Fills the target node with a production, spawning children.
     # Also will maintain the set of leaves/internals/holes/adj.list
     def fill(self, id: int, p: Production, d_level):
-        v = self.graph[id]
+        v = self.search(id, return_copy=False)
         assert(v.is_hole() is True)
         v.apply_prod(p, d_level)  # mutate v
         # Maintain invariants
         self.holes.remove(v.id)  # v is no longer a hole
+        if v.d + 1 not in self.num_at_depth.keys():
+            self.num_at_depth[v.d+1] = 0
         if v.num_children <= 0:
-            self.leaves.remove(v.id)
+            pass
+            #self.leaves.remove(v.id)
         else:  # v has children and thus has become an internal node
-            self.internal_nodes.add(v.id)
-            if v.d + 1 not in self.num_at_depth.keys():  # reached new depth level
-                self.num_at_depth[v.d + 1] = v.num_children
-                for (i, c) in enumerate(v.children):
-                    c.id = label(v.k, v.d+1, i+1)
-                    c.d = v.d + 1
-                    c.k = v.k
-                    self.graph[c.id] = c
-                    self.holes.add(c.id)
-                    self.leaves.add(c.id)
-            else:  # need to update the current depth level with num new children
-                m = self.num_at_depth[v.d+1]
-                self.num_at_depth[v.d + 1] += v.num_children
-                for (i, c) in enumerate(v.children):
-                    c.id = label(v.k, v.d + 1, i + m + 1)
-                    c.d = v.d + 1
-                    c.k = v.k
-                    self.graph[c.id] = c
-                    self.holes.add(c.id)
-                    self.leaves.add(c.id)
+            m = self.num_at_depth[v.d + 1]
+            self.num_at_depth[v.d + 1] += v.num_children
+            for (i, c) in enumerate(v.children):
+                c.i = i + m + 1
+                c.d = v.d + 1
+                c.k = v.k
+                c.id = label(c.k, c.d, c.i)
+                self.graph[c.id] = c
+                self.holes.add(c.id)
+                # self.node_at_depth[c.d].add(c.id)
         # making sure graph is maintained
         self.graph[id] = v
 

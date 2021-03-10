@@ -1,11 +1,10 @@
 from z3 import *
 from src.ast import Node, AST
 from src.semantics import mk_bool
-from src.semantics_v2 import semantics, implemented_grammar
+from src.semantics_v2 import semantics, encode
+
 from copy import deepcopy
 
-def encode(id: int, p:str):
-    return Bool(f'c({id}, {p})')
 
 # Dummy function of the ANALYZE-CONFLICT routine
 # All this is going to do is add the most recent program assignment to the knowledge base and then
@@ -20,43 +19,66 @@ def naive_analyze_conflict(ast: AST, kappa, hp):
     lemmas = [Not(b)]
     return lemmas
 
-def analyze_conflict(program : AST, unsat_core, prog_spec):
-    #print(prog_spec)
-    #print("UNSAT CORE:")
-    #print(unsat_core)
-    processed_core = []
-    for tup in prog_spec:
-        #print(tup)
-        for f1, f2 in zip(tup[0], tup[1]):
-            #print(f1)
-            if f1 in unsat_core:
-                processed_core.append((f2, tup[2], tup[3]))
-    #print("PROCESSED CORE")
-    #print(processed_core)
-    #varphi = [BoolVal(False)]
-    varphi = []
+def analyze_conflict(program : AST, processed_core):
+    lemma = BoolVal(False)
     d_levels = [0]
     s = Solver()
-    for (phi, node_id, production) in processed_core:
-        v = program.search(node_id)
-        c_syms = [c.non_terminal for c in v.children]
-        pp = [p for p in program.prods[v.non_terminal] if p[1] == c_syms]
+    for (phi, node_id, chi_n) in processed_core:
+        #print("TRYING TO CHECK")
+        #print(f'{phi}, {node_id}, {chi_n}')
+        #print("AVAILABLE NODES")
+        #print(program.graph.keys())
+        node = program.search(node_id)
+        ret_type = node.non_terminal
         sigma = []
-        for p in pp:
+        #print(ret_type)
+        if not node.children:
+           #continue
+           ops = [p for p in program.prods[ret_type] if not p[1]]
+        else:
+           a1_ak = {c.non_terminal for c in node.children}
+           #print("a1_ak")
+           #print(a1_ak)
+           #print(program.prods[ret_type])
+           ops = [p for p in program.prods[ret_type]
+                  for a in a1_ak if a in p[1]]
+        #ops = [p for p in program.prods[ret_type]]
+        q = And(phi)
+        #print("CHECKING")
+        #print(chi_n)
+        #print(ops)
+        for op in ops:
             s.push()
-            v_ = deepcopy(v)
-            v_.children = []
-            v_.terminal = None
-            v_.apply_prod(p)
-            op_spec = semantics(v_)
-            fmla = Not(Implies(And(op_spec), phi))
-            s.add(fmla)
-            if unsat == s.check():
-                sigma.append(Not(encode(v.id, p[0])))
+            # this is a hack to retrieve the component smt formulas
+            # because I didn't plan this correctly lol
+            u = deepcopy(node)
+            u.children = []
+            u.apply_prod(op)
+            # now we check if this is equivalent modulo conflict
+            chi_semantics = semantics(u, program.inputs)
+            p = And(chi_semantics)
+            modulo_conflict = Implies(p, q)
+            #print("TESTING IMPLICATION")
+            #print(modulo_conflict)
+            s.add(Not(modulo_conflict))
+            result = s.check()
+            equiv_modulo_conflict = result == unsat
             s.pop()
+            if equiv_modulo_conflict:
+                #print("MODULO CONFLICT")
+                sigma.append(Not(encode(node, op)))
+        #print(sigma)
+        # if the lemma will include the node, add decision level
         if sigma:
-            varphi.append(And(sigma))
-            d_levels.append(v.d_level)
-    return [simplify(Or(varphi))], d_levels
+            d_levels.append(node.d_level)
+            lemma = Or(lemma, And(sigma))
+    # return the learned lemma
+    #print("LEARNED LEMMA")
+    #pp(simplify(lemma))
+    #print("DECISION LEVELS")
+    #print(d_levels)
+    return [lemma], d_levels
+
+
 
 

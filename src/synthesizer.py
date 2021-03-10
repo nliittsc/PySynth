@@ -90,8 +90,8 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
             #lemmas = naive_analyze_conflict(program, unsat_core, (h, p))
             lemmas, d_levels = analyze_conflict(program, unsat_core, prog_spec, d_level)
             knowledge_base += lemmas
-            print("DECISION LEVELS:")
-            print(d_levels)
+            #print("DECISION LEVELS:")
+            #print(d_levels)
             if len(d_levels) == 1:  # Go back one step
                 d_level -= 1
                 program = deepcopy(decicision_map[d_level])
@@ -106,7 +106,7 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
                     d_level -= 1
                     program = deepcopy(decicision_map[d_level])
 
-            print(f"BACKTRACKING TO DECISION LEVEL {d_level}")
+            #print(f"BACKTRACKING TO DECISION LEVEL {d_level}")
             program.print()
 
         else:  # search can continue
