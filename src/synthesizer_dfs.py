@@ -143,7 +143,7 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
                                  and p[0] != 'str.replace']
     program.prods['ntInt'] = [p for p in program.prods['ntInt']
                               if p[0] != 'str.to.int']
-    timeout = 60
+    timeout = 300
     elapsed_time = 0
     num_conflicts = 0
     num_rounds = 1
@@ -160,6 +160,7 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
         print(elapsed_time)
         program = deepcopy(decision_map[0])  # this means we restart the search
         d_level = 0
+        num_conflicts = 0
         num_restarts += 1
         print("STARTING FROM FRESH PROGRAM")
         # decision_map[0] = copy(program.work_list)
