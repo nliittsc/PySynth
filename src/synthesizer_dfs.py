@@ -4,10 +4,10 @@ from src.analyze_conflict import naive_analyze_conflict, analyze_conflict
 from src.check_conflict import check_conflict
 from src.decide import decide, is_consistent
 from src.interpreter import interpreter
-from copy import deepcopy
+from copy import deepcopy, copy
 import time
 
-from src.propogate import propogate1, propogate2
+from src.propogate import propogate1, propogate2, simple_propogate
 from src.semantics import sem, infer_spec
 import numpy as np
 import random
@@ -50,6 +50,8 @@ def get_decision_level(d_levels):
         else:
             return max(d_levels)
 
+
+
 # maintain program search state
 class Trail:
     def __init__(self):
@@ -74,13 +76,17 @@ class NodeTrail:
     def __init__(self):
         self.trail_ = []
 
-    def append(self, d_level, node):
-        self.trail_.append((d_level, node))
+    def append(self, d_level, node : Node):
+        self.trail_.append((d_level, node.id))
 
 
     # simply retrieves a partial program at a decision level
     def pop(self):
         return self.trail_.pop()
+
+    # peek at the latest
+    def peek(self):
+        return self.trail_[-1]
 
     # removes programs at decision levels above the d_bound.
     # Then returns the highest decision level
@@ -88,6 +94,41 @@ class NodeTrail:
         self.trail_ = [(d_level, node)
                       for d_level, node in self.trail_
                       if d_level <= d_bound]
+
+    def clear(self):
+        self.trail_ = []
+
+
+
+# def backtrack(program, trail, d_level):
+#     if d_level == 0:
+#         trail.clear()
+#         program = deepcopy(program.fresh_start)
+#         program.work_list = []
+#         program.work_list.append((0, program.root))
+#     else:
+#         d_level_, node_id = trail.peek()
+#         while d_level_ > d_level:
+#             d_level_, node_id = trail.pop()
+#             program.make_hole_(node_id)
+#             print([(d, h) for d, h in trail.trail_])
+#
+#         d_level_, _ = program.work_list[-1]
+#         while d_level_ > d_level:
+#             d_level_, _ = program.work_list.pop()
+#             print([(d, h) for d, h in program.work_list])
+#         v = program.search(node_id)
+#         workers = []
+#         for w in v.get_children():
+#             workers.insert(0, (d_level, w.id))
+
+# This is inefficient, but maintain the trail is hard
+def backtrack(decision_map, d_level):
+    program = deepcopy(decision_map[d_level])
+    return program
+
+
+
 
 # The SYNTHESIZE loop to be called from main.
 def synthesize(max_iter: int, fun_dict, constraints, var_decls):
@@ -107,164 +148,97 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
     num_rounds = 1
     num_restarts = -1
     start_time = time.time()
+    program.work_list.append((0, 1))
     fresh_program = deepcopy(program)
-    unrealizable = False
+    #fresh_program.fresh_start = deepcopy(program)
+    fresh_program.d_level = 0
+    decision_map = {}
+    decision_map[0] = deepcopy(fresh_program)
     while elapsed_time < timeout:
         print("ELAPSED TIME:")
         print(elapsed_time)
-        program = deepcopy(fresh_program)
+        program = deepcopy(decision_map[0])  # this means we restart the search
         d_level = 0
         num_restarts += 1
         print("STARTING FROM FRESH PROGRAM")
-        #trail = Trail()
-        #trail.append(d_level, program)
-        trail = NodeTrail()
-        node_id = 1
-        #trail.append()
-        print("trail")
-        print(trail.trail_)
+        # decision_map[0] = copy(program.work_list)
         # simplify knowledge base to help running time
-        #knowledge_base = [simplify(And(knowledge_base))]
         while not program.is_concrete() and elapsed_time < timeout:
             print("ELAPSED TIME:")
             elapsed_time = time.time() - start_time
             print(elapsed_time)
-            # basically the decide routine
-            # picking max node_id == deepest hole == depth first search
-            #node_id = max(program.holes)
-
-            # check restart conditions
-            if num_conflicts > 30 and np.random.uniform() < 0.10:
-                print("RANDOM RESTART")
+            print("WORKER LIST")
+            print([(d, h) for d, h in program.work_list])
+            d_level, hole_id = program.work_list.pop()
+            hole = program.search(hole_id)
+            program.d_level = d_level
+            assert(hole.is_hole() is True)
+            # select a production
+            production = program.decide(hole, knowledge_base)
+            if production is None:
+                # no consistent production, so we restart until
+                # there is a better backtracking strategy
                 break
+            print(f"PRODUCTION APPLIED: {production[0]}")
 
-            # Check consistency with knowledge base
-            knowledge_base = [simplify(And(knowledge_base))]
-            if is_unsat(knowledge_base):
-                print("KNOWLEDGE BASE INCONSISTENT. TERMINATING SYNTHESIS.")
-                return program, False
-
-            # INVARIANT: We always have a hole h at this point
-            h = program.search(node_id)
-            valid_rules = program.prods[h.non_terminal]
-            consistent_rules = [p for p in valid_rules
-                                if is_consistent(program, (h, p), knowledge_base, d_level)]
-            if not consistent_rules:
-                print("RESTARTING")
-                break
-            non_expanders = [p for p in consistent_rules if not p[1]]
-            expanders = [p for p in consistent_rules if p[1]]
-            # we bias towards productions that spawn no children.
-            if np.random.uniform() < 0.60:
-                if non_expanders:
-                    np.random.shuffle(non_expanders)
-                    p = non_expanders.pop()
-                elif expanders:
-                    np.random.shuffle(expanders)
-                    p = expanders.pop()
-            else:
-                rnd_index = np.random.choice(range(len(consistent_rules)))
-                p = consistent_rules[rnd_index]
-            # okay, this is a valid and consistent decision
-            # update decision level
-            d_level += 1
-            conflict, concrete = propogate1(program, (h, p), knowledge_base, d_level, trail)
-            #print("PROGRAM AFTER PROPOGATION")
-            #program.print()
-            if conflict:  # propogate detected inconsistency. Backtrack until conflict is gone
-                #print("CONFLICT WITH KNOWLEDGE BASE")
-                s = Solver()
-                while conflict:
-                    s.push()
-                    d_level, node_id = trail.pop()
-                    #print("OLD PROGRAM")
-                    #program.print()
-                    program.delete_(node_id)
-                    #print("NEW PROGRAM")
-                    #program.print()
-                    sat_problem = And(program.encode() + knowledge_base)
-                    #print("SAT PROBLEM")
-                    #print(sat_problem)
-                    conflict = s.check(sat_problem) == unsat
-                    s.pop()
-                trail.append(d_level, node_id)  # last consistent decision. Add back to trail
-                continue  # go back and make a new decision.
-
-            # Have made a valid decision at this point.
-            print(f"PROGRAM AT LEVEL {d_level}")
+            # simple fill for now
+            conflict, concrete = simple_propogate(program, (hole, production), knowledge_base, d_level, NodeTrail())
+            print("CURRENT PROGRAM")
             program.print()
+            print(f"CURRENT HOLES: {[h.id for h in program.get_holes()]}")
+            print(f"CURRENT WORKER LIST: {[(d, h) for d, h in program.work_list]}")
+            if conflict:  # program is not consistent with knowledge base, backtrack
+                break   # TODO: fix backtracking
+                # s = Solver()
+                # while conflict:
+                #     s.push()
+                #     d_level, node_id = trail.pop()
+                #     program.make_hole_(node_id)
+                #     sat_problem = program.encode() + knowledge_base
+                #     s.add(sat_problem)
+                #     conflict = s.check() == unsat
+                #     s.pop()
+
+            # update decision level
+            program.d_level = d_level
+
+            # made it this it far. Check for conflicts
             unsat_core = check_conflict(program, constraints)
-
-            if unsat_core:  # conflict found
-                print("CONFLICT FOUND")
-                num_conflicts += 1
-                lemmas, decision_levels = analyze_conflict(program, unsat_core)
-                knowledge_base += lemmas
-                d_bound = get_decision_level(decision_levels)
-                # revert back to older state
-                #print(f"BACKTRACKING TO LEVEL {d_bound}")
-                #print("TRAIL")
-                #print(trail.trail_)
-                if d_bound == 0:
-                    node_id = 1
-                    trail.trail_ = []
-                    d_level = 1
-                    program = deepcopy(fresh_program)
-                else:
-                    d_level, node_id = trail.pop()
-                    trail.append(d_level, node_id)
-                while d_level > d_bound and trail.trail_:
-                    d_level, node_id = trail.pop()
-                    #print(f"DELETING NODE {node_id}")
-                    program.delete_(node_id)
-                #print("new trail")
-                #print(trail.trail_)
-                print("BACKTRACKED TO")
+            if unsat_core:  # A conflict was detected
+                print("Conflict detected")
+                # learn a lemma for the knowledge base and get the conflicts for
+                # backtracking
+                lemma, conflicts = analyze_conflict(program, unsat_core)
+                knowledge_base += lemma
+                d_level = get_decision_level(conflicts)  # we backtrack to this level
+                # BACKTRACK STEP
+                program = backtrack(decision_map, d_level)
+                program.d_level = d_level
+                print("PROGRAM AFTER BACKTRACKING")
                 program.print()
-                assert (program.search(node_id).is_hole() is True)
-            elif concrete:  # found a concrete program that passes consistency tests
-                break
-            else:  # no conflict and partial, pick left most hole
-                d_level, node_id = trail.pop()
-                trail.append(d_level, node_id)
-                v = program.search(node_id)
-                if v.num_children > 0:
-                    for w in v.children:
-                        if w.is_hole():
-                            node_id = w.id
-                            break
-                else:  # is filled with a non-terminal.
-                    # must find nearest ancestor with a hole.
-                    has_no_holes = True
-                    print(f"{node_id} IS NOT A HOLE.")
-                    #program.search(node_id).print()
-                    #print("available holes")
-                    #print(program.holes)
-                    while has_no_holes:
-                        node_id = v.parent  # go back up a level.
-                        v = program.search(node_id)
-                        for w in v.children:
-                            #print(f"checking if {w.id} is a hole")
-                            if w.is_hole():
-                                node_id = w.id
-                                has_no_holes = False
-                                break
-                print(f"NEXT HOLE TO SEARCH {node_id}")
-                program.search(node_id).print()
+
+            # store the program state
+            decision_map[d_level] = deepcopy(program)
+
+            if program.is_concrete():
+                results = interpreter(program, constraints)
+                verified = results['verified']
+                if verified:
+                    print("SATISFYING PROGRAM FOUND")
+                    program.print()
+                    return program, True
+                else:  # starting over search
+                    break
 
 
 
 
-        # keep this check here in case we break for a restart.
-        if program.is_concrete():
-            result = interpreter(program, constraints)
-            verified = result['verified']
-            if verified:
-                print("VALID PROGRAM FOUND!")
-                program.print()
-                print(f"num restarts: {num_restarts}")
-                return program, True
-        # if we get to this point, program search starts over
+
+
+
+
+
+
 
 
 

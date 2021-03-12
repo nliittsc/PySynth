@@ -138,7 +138,8 @@ def semantics(node: Node, inputs):
         #return [BoolVal(True)]
         return []
 
-    term = node.terminal
+    term = node.production
+    #print(term)
     if isinstance(term, int):
         return [o_int == term]
 
@@ -288,7 +289,7 @@ def annotate_ast(node : Node, inputs):
         v = queue.pop(0)
         v.smt = semantics(v, inputs)
         if v.num_children > 0:
-            for c in v.children:
+            for c in v.get_children():
                 queue.append(c)
 
 # perform variable substitutions to connect component specs
@@ -314,15 +315,19 @@ def subst(node : Node):
     # Do substitutions for the node's children. Aka, it's 'inputs'.
     if node.num_children > 0:
         num_input = 0
-        for c in node.children:
+        for c in node.get_children():
             c_id = 'o' + str(c.id)
             num_input += 1
+            # this is inefficient, because it's currently too hard to
+            # case split on the production symbol until the semantics
+            # are finalized
             if c.non_terminal == 'ntString':
                 c_head = Int(c_id + '.head')
                 c_last = Int(c_id + '.last')
                 c_min = Int(c_id + '.min')
                 c_max = Int(c_id + '.max')
                 c_len = Int(c_id + '.len')
+                x_int = Int('x' + str(num_input))
                 x_head = Int('x' + str(num_input) + '.head')
                 x_last = Int('x' + str(num_input) + '.last')
                 x_min = Int('x' + str(num_input) + '.min')
@@ -355,7 +360,7 @@ def infer_spec(node : Node, inputs: [str]):
     while queue:
         v = queue.pop(0)
         subbed_component = subst(v)
-        term = v.terminal if not v.is_hole() else None
+        term = v.production if not v.is_hole() else None
         if v.id == 1:
             # need to connect the outputs.
             t1 = Int('o1.len')
@@ -376,7 +381,7 @@ def infer_spec(node : Node, inputs: [str]):
             "terminal": term,
         }
         if v.num_children > 0:
-            for c in v.children:
+            for c in v.get_children():
                 queue.append(c)
     return spec
 

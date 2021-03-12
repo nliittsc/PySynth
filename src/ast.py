@@ -1,6 +1,7 @@
 from z3 import *
 from typing import Union, Tuple, Set
 from copy import deepcopy
+import random
 
 
 
@@ -10,95 +11,115 @@ from copy import deepcopy
 Terminal = Union[str, int, float]
 Production = Tuple[Terminal, str]
 
+# Helper to label
+def label(k: int, d:int, i: int) -> int:
+    return (k ** (d - 1)) + i - 1
+
+
+# helper to encode c(node, production)
+def encode(node, production):
+    enc_string = 'c(' + str(node.id) + ', ' + str(production[0]) + ')'
+    return Bool(enc_string)
+
+
+
 
 # This Node class will represent a part of a program
+# Nodes will be considered "empty" until they are given a
+# non-terminal symbol. Empty nodes are *not* holes.
+# A node is only a Hole if it has a non-terminal symbol *and* no
+# production rule. Empty nodes are required to maintain algorithm invariants
 class Node:
-    def __init__(self, symbol: str, k: int = None, d: int = None, i: int = None):
-        self.d = d
+    def __init__(self, k=0,d=0,i=0):
+        self.non_terminal = None
+        self.production = None
         self.k = k
+        self.d = d
         self.i = i
-
-        if d is None:
-            self.d = 0
-        if k is None:
-            self.k = 0
-        if i is None:
-            self.i = 0
-
-        self.id = -1
-
-        #self.id = label(k, d, i)    # We should probably do this during fill
-        # Just some aliases for the non-terminal
-        self.non_terminal = symbol
-
-        # Just some aliases for the terminal symbol/operator
-        self.terminal = None
-
-        # The children represent the 'inputs' to a terminal operator. E.g., ("+", ["I", "I"]) has children ["I", "I"]
+        self.id = label(k, d, i)
         self.children = []
+        self.children_ids = set()
         self.num_children = 0
+        self.parent = -1
+        self.d_level = 0
+        # TODO: think about the relationship between self.i and self.offset (for children making)
 
-        #parent node
-        self.parent = None
+    # indicates whether a given node is an "empty" node
+    # or if it is "live", meaning it has a non-terminal
+    def is_empty(self):
+        return self.non_terminal is None
 
-        #return type?
-        self.type = None
+    # makes the node empty
+    def make_empty_(self, max_height=0):
+        self.non_terminal = None
+        self.production = None
 
-        # denotes a valid set of production rules for this node
-        self.valid_rules = None
+    # Makes a node "live" by applying a non-terminal.
+    def make_notempty_(self, non_terminal):
+        self.non_terminal = non_terminal
 
-        # decision level. Used for backtracking
-        self.d_level = -1
+    # Makes k new children. Can also be used to delete descendants.
+    # k * (i - 1) + j + 1 for j in range(0,k) == formula to give
+    # children nodes their position in the d+1th level
+    def make_k_children_(self):
+        self.children = [Node(k=self.k, d=self.d+1, i=self.k*(self.i-1) + j + 1)
+                         for j in range(self.k)]
+        self.children_ids = {label(self.k, self.d+1, self.i+j) for j in range(self.k)}
 
-    # Checks if a given node is a hole or not. A node is a hole if it does not have a production rule applied.
+
+    # Checks if a given node is a hole or not.
+    # A node is a hole if it does not have a production rule applied.
     def is_hole(self) -> bool:
-        if len(self.children) > 0 and self.terminal == None:
-            # this should never happen
-            raise ValueError('Node has children, but no production rule!')
-        return self.terminal == None
+        has_no_production = self.production is None
+        is_not_empty = not self.is_empty()
+        return has_no_production and is_not_empty
 
-    # assumes we have a dictionary
-    def update_valid_rules(self, product_map):
-        rules = product_map[self.non_terminal]
-        self.valid_rules = rules
 
     def print(self):
         print(f"id: {self.id}")
         print(f"depth: {self.d}")
         print(f"num children: {self.num_children}")
         print(f"non-terminal: {self.non_terminal}")
-        print(f"production applied: {self.terminal} -> {[c.non_terminal for c in self.children]}")
+        print(f"production applied: {self.production} -> {[c.non_terminal for c in self.children]}")
 
     # Helper that applies a production rule to a node.
-    def apply_prod(self, p: Production, d_level: int = -1):
-        self.terminal = p[0]
-        syms = p[1]
-        n: int = len(p[1])
-        self.d_level = d_level
-        self.children = []  # remove old children
-        for i in range(n):
-            node = Node(syms[i])
-            node.parent = self.id
-            self.children.append(node)
-        self.num_children = n
+    # assumes children were already created by increasing
+    # the height of the AST appropriately
+    def apply_prod_(self, p: Production):
+        self.production = p[0]
+        nonterminal_inputs = p[1]
+        self.num_children = len(nonterminal_inputs)
+        self.make_k_children_()
+        for i, nt_symbol in enumerate(nonterminal_inputs):
+            self.children[i].make_notempty_(nt_symbol)
+            self.children[i].parent = self.id
+            assert (self.children[i].is_empty() is False)
+
+    # gets those children of a node which are holes and not empty
+    def get_children(self):
+        to_return = []
+        for w in self.children:
+            if not w.is_empty():
+                to_return.append(w)
+        return to_return
 
 
     # returns a symbolic variable (compatible with python's Z3 api) that encodes the node as a boolean
     def encode_node(self):
         if self.is_hole():
             raise ValueError(f"No production assigned to node {self.id}")
-        c = f"c({self.id}, {self.terminal})"
+        c = f"c({self.id}, {self.production})"
         return Bool(c)
         #return encode(self, self.)
 
 
 
-# Helper to label
-def label(k: int, d:int, i: int) -> int:
-    return (k ** (d - 1)) + i - 1
-
-
-
+# IMPORTANT CHANGE. This is now a k-tree representation, where
+# k is the maximum arity any production rule/operator.
+# Trees will always be filled from left to right
+# Some nodes will represent empty symbols.
+# The reason to do this is to help keep the tree balanced
+# during the program search.
 
 # This AST class represents a partial or complete program.
 class AST:
@@ -116,21 +137,28 @@ class AST:
         self.prod_list = [item for sublist in self.prods.values() for item in sublist]
         self.root = None
         self.arity = None
+        self.d_level = 0
         self.input_dict = {v: 'x' + str(i + 1) for (i, v) in enumerate(self.inputs)}
 
         # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
-        self.num_at_depth = {}
-        self.node_at_depth = {}
+        self.num_nonempty_at_depth = dict()
+        self.nodes_at_depth = dict()
+
+        # Tracks the maximum allowed height of the AST.
+        self.max_height = 0
+
+        # the current set of holes being considered
+        self.work_list = []
+
+        # the current SAT encoding of the program.
+        self.sat_problem = []
 
         # Replacing searches with explicit lookups. Should be more efficient.
-        self.graph = dict()  # adjacency list type representation. Holds a node at each key
-        self.leaves = set()  # holds ids of leaf nodes (which might be holes)
-        self.internal_nodes = set()  # holds ids of non-leaf nodes
+        self.graph_ = dict()  # adjacency list type representation. Holds a node at each key
+        #self.leaves = set()  # holds ids of leaf nodes (which might be holes)
+        #self.internal_nodes = set()  # holds ids of non-leaf nodes
         self.holes = set()  # only holds ids of holes
 
-        # Represents a 'trail' (list) of nodes that have currently been traversed
-        # Used for backtracking efficiently
-        self.trail = []
 
     # Computes the maximum arity of the grammar operators
     def max_arity(self) -> int:
@@ -143,151 +171,113 @@ class AST:
     def make_root(self) -> Node:
         k: int = self.max_arity()
         self.arity = k
-        r: Node = Node(self.start_symbol)
-        r.id = label(self.arity, 1, 1)
-        r.d = 1
-        r.k = k
-        r.i = 1
-        #r.type = self.type_dict[self.start_symbol]
+        self.max_height = 1
+        self.nodes_at_depth[1] = set()
+        r = Node(k, 1, 1)
+        r.non_terminal = self.start_symbol
+        assert(isinstance(r.non_terminal, str))
+
         self.root = r
-        self.num_at_depth[1] = 1
-        self.graph[r.id] = self.root
-        self.leaves.add(r.id)
+        self.num_nonempty_at_depth[1] = 1
+        self.graph_[r.id] = self.root
+        self.nodes_at_depth[1].add(self.root)
         self.holes.add(r.id)
+
+    # Increase the  height of the AST, and spawn
+    # empty children beneath the current height.
+    def increase_height_(self):
+        k = self.arity
+        d = self.max_height
+        self.nodes_at_depth[d+1] = set()
+        for i, node in enumerate(self.nodes_at_depth[d]):
+            node.make_k_children_()
+            for w in node.children:  # constant time w.r.t. max-arity
+                self.graph_[w.id] = w
+                self.nodes_at_depth[d+1].add(w)
+        self.max_height += 1
+        print(f"new children at height {d+1}: {[v.id for v in self.nodes_at_depth[d+1]]}")
+
+    # 'Delete' a node in the AST by making it an empty node
+    # Does the same to all its children
+    # Note: does not actually remove the node, simply modifies it
+    # and all its children to be considered empty
+    # This should *not* affect the node ids (thats our invariant)
+    def delete_node_(self, id: int):
+        node: Node = self.search(id, return_copy=False)
+        queue = [node]
+        while queue:
+            v = queue.pop(0)
+            v.make_empty_()
+            assert(v.is_empty() is True)
+            for w in v.children:
+                if not w.is_empty():  # we dont traverse holes
+                    queue.append(w)
+
+    # Takes a node, and makes it into a hole (as opposed to empty)
+    def make_hole_(self, id:int):
+        node = self.search(id)
+        non_terminal = node.non_terminal
+        self.delete_node_(id)
+        node = self.search(id, return_copy=False)
+        node.non_terminal = non_terminal
+        assert(self.search(id).is_empty() is False)
+        assert(self.search(id).is_hole() is True)
 
 
 
     # Returns a set of holes (nodes) currently maintained in the partial program
     # note: default is to return a deep copy of the nodes
+    # TODO: figure out if deepcopy is too slow
+    # TODO: is it better to maintain a list of holes or to just traverse AST?
+    # Running time should be about the same?
     def get_holes(self, return_copy: Bool = True) -> list[Node]:
-        holes = [v for k, v in self.graph.items() if k in self.holes]
+        #holes = [v for k, v in self.graph.items() if k in self.holes]
+        #if return_copy:
+        #    return (deepcopy(holes))
+        #else:
+        #    return holes
+
+        holes = []
+        queue = [self.root]
+        while queue:
+            v = queue.pop(0)
+            if v.is_hole():
+                holes.append(deepcopy(v))
+            for c in v.children:
+                queue.append(c)
         if return_copy:
-            return (deepcopy(holes))
+            return deepcopy(holes)  # this might be slow
         else:
             return holes
-
-        # if r is None:
-        #     r = self.root
-        # holes = []
-        # stack = [r]
-        # while stack:
-        #     v = stack.pop()
-        #     if v.is_hole():
-        #         holes.append(deepcopy(v))
-        #     for c in v.children:
-        #         stack.append(c)
-        # return holes
 
     # note: default is to return a deep copy of the target node
     def search(self, id: int, return_copy: bool=True):
         #print("SEARCHING")
         #print(id)
         if return_copy:
-            return deepcopy(self.graph[id])
+            return deepcopy(self.graph_[id])
         else:
-            return self.graph[id]
+            return self.graph_[id]
 
-    def relabel_(self):
-        r = self.root
-        k = r.k
-        queue = [r]
-        self.num_at_depth[1] = 0  # maintain invariant
-        old_d = 0
-        highest_depth = 0
-        while queue:
-            v = queue.pop(0)
-            new_d = v.d
-            self.num_at_depth[v.d] += 1
-            if old_d < new_d:
-                i = 1
-                highest_depth = new_d
-            for w in v.children:
-                w.d = v.d + 1
-                w.i = i
-                w.k = k
-                old_id = w.id
-                w.id = label(w.k, w.d, w.i)
-                #print(f"NEW LABEL {w.id}")
-                #print(f"NEW ID {old_id}")
-                self.graph[w.id] = self.graph[old_id]
-                queue.append(w)
-                i += 1
-            old_d = new_d
-        for k, v in self.num_at_depth.items():
-            if k <= highest_depth:
-                self.num_at_depth[k] = v
-            else:
-                self.num_at_depth[k] = 0
-        #print("REBALANCED DEPTHS")
-        #print(self.num_at_depth)
-        #print("HIGHEST DEPTH")
-        #print(highest_depth)
-
-
-
-
-
-
-    # given a node id, deletes the node, all its children, and rebalances AST
-    # Note, id node is replaced with a hole, to maintain AST invariant
-    def delete_(self, id: int):
-        u = self.search(id, return_copy=False)
-        #print(f"DELETING NODE {u.id}")
-        queue = [u]
-        ids_to_delete = []
-        # make deletions
-        while queue:
-            v = queue.pop(0)
-            self.num_at_depth[v.d] -= 1
-            if v.is_hole():
-                self.holes.discard(v.id)
-            for w in v.children:
-                ids_to_delete.append(w.id)
-                queue.append(w)
-        # Remove all descendants
-        #print("REMOVED IDS")
-        #print(ids_to_delete)
-        #for node_id in ids_to_delete:
-        #    del self.graph[node_id]
-        u.terminal = None
-        u.children = []
-        u.num_children = 0
-        self.relabel_()
-        self.holes.add(u.id)
-        self.graph[u.id] = u
-        #print("NODES AT DEPTHs")
-        #print(self.num_at_depth)
 
 
 
     # Fills the target node with a production, spawning children.
     # Also will maintain the set of leaves/internals/holes/adj.list
-    def fill(self, id: int, p: Production, d_level):
-        v = self.search(id, return_copy=False)
-        assert(v.is_hole() is True)
-        v.apply_prod(p, d_level)  # mutate v
-        # Maintain invariants
-        self.holes.remove(v.id)  # v is no longer a hole
-        if v.d + 1 not in self.num_at_depth.keys():
-            self.num_at_depth[v.d+1] = 0
-        if v.num_children <= 0:
-            pass
-            #self.leaves.remove(v.id)
-        else:  # v has children and thus has become an internal node
-            m = self.num_at_depth[v.d + 1]
-            self.num_at_depth[v.d + 1] += v.num_children
-            for (i, c) in enumerate(v.children):
-                c.i = i + m + 1
-                c.d = v.d + 1
-                c.k = v.k
-                c.id = label(c.k, c.d, c.i)
-                self.graph[c.id] = c
-                self.holes.add(c.id)
-                # self.node_at_depth[c.d].add(c.id)
-        # making sure graph is maintained
-        self.graph[id] = v
+    def fill(self, id: int, p: Production):
+        v: Node = self.search(id, return_copy=False)
+        assert(v.is_hole() is True)  # This should never fail
+        if self.max_height < v.d + 1:
+            self.nodes_at_depth[v.d + 1] = set()
+            self.max_height += 1
+
+        v.apply_prod_(p)  # apply the production
+        for w in v.children:  # constant time w.r.t. max-arity
+            self.graph_[w.id] = w
+            self.nodes_at_depth[v.d + 1].add(w)
 
 
+        v.d_level = self.d_level
 
 
         # queue = [self.root]
@@ -328,9 +318,12 @@ class AST:
 
     # Checks if a program has all its holes filled, and is thus a full program
     def is_concrete(self):
-        #holes = self.holes()
-        return len(self.holes) == 0
-
+        holes = self.get_holes()
+        #return len(self.holes) == 0
+        if holes:
+            return False
+        else:
+            return True
     # Returns the partial program as a SAT formula that is compatible with python's Z3 API
     def encode(self):
         r = self.root
@@ -338,30 +331,47 @@ class AST:
         stack = [r]
         while stack:
             v = stack.pop(0)
-            if not v.is_hole():  # Can only encode nodes where a production is applied
+            if not v.is_hole() and not v.is_empty():  # Can only encode nodes where a production is applied
                 encoded_vars.append(v.encode_node())
                 for c in v.children:
                     stack.append(c)
         # Return the conjunction of the boolean variables
         return encoded_vars
 
+    def decide(self, node: Node, knowledge_base) -> Production:
+        # Get productions consistent with the knowledge base
+        program_encoding = self.encode()
+        sat_problem = program_encoding + knowledge_base
+        s = Solver()
+        consistent_productions = [p for p in self.prods[node.non_terminal]
+                                  if sat == s.check(sat_problem + [encode(node, p)])]
+
+        # if no production can be applied, need to backtrack
+        if not consistent_productions:
+            return None
+        else:  # this strategy is random
+            production = random.choice(consistent_productions)
+            return production
+
 
 
     # converts the AST to an S-expression representing a program
-    def to_program(self, r: Node = None):
+    def to_program(self, r: Node=None):
         if r is None:
             r = self.root
+        assert (r.is_empty() is False)  # this should never fail
         if r.num_children == 0:
             if r.is_hole():
                 return r.non_terminal
             else:
-                return r.terminal
+                return r.production
         else:
             children = []
             for c in r.children:
-                p = self.to_program(c)
-                children.append(p)
-            return [r.terminal, children]
+                if not c.is_empty():
+                    p = self.to_program(c)
+                    children.append(p)
+            return [r.production, children]
 
 
 

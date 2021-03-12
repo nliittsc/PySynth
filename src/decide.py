@@ -8,6 +8,7 @@ import numpy as np
 
 # Dummy functions for now. Corresponds to checking if fill(P, H, p) ~ Omega in the paper.
 # This is called "checking consistency". Omega is a set of z3 compatible lemmas.
+# NOTE(nathan): Avoid this. It is very inefficient.
 def is_consistent(ast, hole, knowledge_base, d_level):
     #print(f"isconsistent {hole[0].id}")
     #print(f"h prod {hole[0].terminal}")

@@ -23,60 +23,55 @@ def analyze_conflict(program : AST, processed_core):
     lemma = BoolVal(False)
     d_levels = [0]
     s = Solver()
+    print("PROCESSED CORE")
+    print(processed_core)
     for (phi, node_id, chi_n) in processed_core:
-        #print("TRYING TO CHECK")
-        #print(f'{phi}, {node_id}, {chi_n}')
-        #print("AVAILABLE NODES")
-        #print(program.graph.keys())
+        print("TRYING TO CHECK")
+        print(f'{phi}, {node_id}, {chi_n}')
+        print(f"AVAILABLE NODES: {list(program.graph_.keys())}")
+        print(f"CURRENT HOLES: {[h.id for h in program.get_holes()]}")
         node = program.search(node_id)
         ret_type = node.non_terminal
         sigma = []
         #print(ret_type)
-        if not node.children:
-           #continue
+        if not node.get_children():
            ops = [p for p in program.prods[ret_type] if not p[1]]
         else:
-           a1_ak = {c.non_terminal for c in node.children}
-           #print("a1_ak")
-           #print(a1_ak)
-           #print(program.prods[ret_type])
+           a1_ak = {c.non_terminal for c in node.get_children()}
+
            ops = [p for p in program.prods[ret_type]
                   for a in a1_ak if a in p[1]]
-        #ops = [p for p in program.prods[ret_type]]
         q = And(phi)
-        #print("CHECKING")
-        #print(chi_n)
-        #print(ops)
         for op in ops:
             s.push()
             # this is a hack to retrieve the component smt formulas
             # because I didn't plan this correctly lol
             u = deepcopy(node)
             u.children = []
-            u.apply_prod(op)
+            u.apply_prod_(op)
             # now we check if this is equivalent modulo conflict
             chi_semantics = semantics(u, program.inputs)
             p = And(chi_semantics)
             modulo_conflict = Implies(p, q)
-            #print("TESTING IMPLICATION")
-            #print(modulo_conflict)
+            print("TESTING IMPLICATION")
+            print(modulo_conflict)
             s.add(Not(modulo_conflict))
             result = s.check()
             equiv_modulo_conflict = result == unsat
             s.pop()
             if equiv_modulo_conflict:
-                #print("MODULO CONFLICT")
+                print("MODULO CONFLICT")
                 sigma.append(Not(encode(node, op)))
-        #print(sigma)
+        print(sigma)
         # if the lemma will include the node, add decision level
         if sigma:
             d_levels.append(node.d_level)
             lemma = Or(lemma, And(sigma))
     # return the learned lemma
-    #print("LEARNED LEMMA")
-    #pp(simplify(lemma))
-    #print("DECISION LEVELS")
-    #print(d_levels)
+    print("LEARNED LEMMA")
+    pp(simplify(lemma))
+    print("DECISION LEVELS")
+    print(d_levels)
     return [lemma], d_levels
 
 

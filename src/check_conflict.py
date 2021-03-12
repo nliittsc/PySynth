@@ -78,6 +78,8 @@ def check_conflict(program : AST, constraints):
     #print("INPUTS")
     #print(program.inputs)
     program_smt = infer_spec(program.root, program.inputs)
+    print("PROGRAM SPEC")
+    print(program_smt)
     # flatten list of specs
 
     s = Solver()

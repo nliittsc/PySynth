@@ -6,6 +6,40 @@ from src.semantics_v2 import encode
 import numpy as np
 
 
+
+def simple_propogate(program : AST, hp_pair, knowledge_base, d_level, trail):
+    hole = hp_pair[0]
+    production = hp_pair[1]
+    enc_production = encode(hole, production)
+    sat_prob = program.encode() + knowledge_base + [enc_production]
+    s = Solver()
+    # We must always make sure the problem is consistent with the knowledge base
+    conflict = s.check(sat_prob) == unsat
+    if conflict:
+        return conflict, False
+
+    # no conflict, can fill hole
+    d_level += 1
+    trail.append(d_level, hole)
+    program.fill(hole.id, production)
+    program.d_level += 1
+
+    concrete = program.is_concrete()
+    if concrete:
+        conflict = False
+        return conflict, concrete
+    else:
+        conflict = False
+        concrete = False
+        v = program.search(hole.id, return_copy=False)
+        workers = []
+        for w in program.search(hole.id, return_copy=False).get_children():
+            workers.insert(0, (program.d_level, w.id))
+        program.work_list += workers
+        return conflict, concrete
+
+
+
 def propogate1(program: AST, hp_pair, knowledge_base, d_level, trail=None):
     # check for program consistency
     conflict = False
@@ -32,8 +66,9 @@ def propogate1(program: AST, hp_pair, knowledge_base, d_level, trail=None):
         assert (u.non_terminal == 'ntString')  # should always be true
         # should always have terminals with no children
         valid_choices = [p for p in program.prods[u.non_terminal] if not p[1]]
-        consistent_choices = [p for p in valid_choices
-                              if is_consistent(program, (u, p), knowledge_base, d_level)]
+        program_encoding = program.encode()
+        s = Solver()
+        consistent_choices = [p for p in valid_choices]
         if not consistent_choices:
             conflict = True
             return conflict, concrete
