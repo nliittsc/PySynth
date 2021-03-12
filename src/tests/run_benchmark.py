@@ -5,7 +5,7 @@ from src.synthesizer_dfs import *
 from src.semantics import *
 from src.semantics_v2 import *
 
-dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\benchmark_subset'
+dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\PBE_Strings_2018_comp'
 num_success = 0
 i = 0
 solved = []

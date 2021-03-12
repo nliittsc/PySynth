@@ -350,8 +350,22 @@ class AST:
         if not consistent_productions:
             return None
         else:  # this strategy is random
-            production = random.choice(consistent_productions)
-            return production
+            #production = random.choice(consistent_productions)
+            #return production
+            closers = [p for p in consistent_productions if not p[1]]
+            expanders = [p for p in consistent_productions if p[1]]
+            prob = random.uniform(0,1)
+            if prob < 0.75:  # bias greedy choices
+                if closers:
+                    return random.choice(closers)
+                else:
+                    return random.choice(expanders)
+            else:
+                if expanders:
+                    return random.choice(expanders)
+                else:
+                    return random.choice(closers)
+
 
 
 

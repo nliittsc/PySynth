@@ -4,7 +4,15 @@ from copy import deepcopy
 from src.decide import is_consistent
 from src.semantics_v2 import encode
 import numpy as np
+import random
 
+
+def update_work_list(program, node_id):
+    v = program.search(node_id)
+    workers = []
+    for w in v.get_children():
+        workers.insert(0, (program.d_level, w.id))
+    program.work_list += workers
 
 
 def simple_propogate(program : AST, hp_pair, knowledge_base, d_level, trail):
@@ -37,6 +45,76 @@ def simple_propogate(program : AST, hp_pair, knowledge_base, d_level, trail):
             workers.insert(0, (program.d_level, w.id))
         program.work_list += workers
         return conflict, concrete
+
+
+# propogate without using a trail to maintain state
+def copy_propogate(program: AST, hp_pair, knowledge_base):
+    hole = hp_pair[0]
+    production = hp_pair[1]
+    enc_production = encode(hole, production)
+    sat_prob = program.encode() + knowledge_base + [enc_production]
+    s = Solver()
+    # We must always make sure the problem is consistent with the knowledge base
+    conflict = s.check(sat_prob) == unsat
+    if conflict:
+        return conflict, False
+
+    # no conflict, can fill hole
+    program.d_level += 1
+    program.fill(hole.id, production)
+    update_work_list(program, hole.id)
+
+    concrete = program.is_concrete()
+    if concrete:
+        conflict = False
+        return conflict, concrete
+
+    # propogate further if substring
+    if production[0] == 'str.substr':
+        _, w_id = program.work_list.pop()
+        w = program.search(w_id)
+        valid_prods = [p for p in program.prods[w.non_terminal]
+                       if not p[1] and s.check(sat_prob + [encode(w, p)])]
+        if valid_prods:
+            p_ = random.choice(valid_prods)
+        program.fill(w.id, p_)
+
+    concrete = program.is_concrete()
+    if concrete:
+        conflict = False
+        return conflict, concrete
+
+    # now for the *real* propogate step
+    holes = program.get_holes()
+    prods = program.prods
+    cross_product = [(h, p) for h in holes for p in prods[h.non_terminal]]
+    sat_problem = And(program.encode() + knowledge_base)
+    s = Solver()
+    conflict = False
+    concrete = False
+    for hi, pi in cross_product:
+        s.push()
+        possible_fills = Or([encode(hi, p) for p in prods[hi.non_terminal]])
+        P = And(sat_problem, possible_fills)
+        Q = encode(hi, pi)
+        P_implies_Q = Implies(P, Q)
+        # Need to prove if the negation is UNSAT
+        s.add(Not(P_implies_Q))
+        should_propogate = s.check() == unsat
+        s.pop()
+        if should_propogate:
+            # only one valid assignment possible, need to propogate
+            conflict, concrete = copy_propogate(program, (hi, pi), knowledge_base)
+
+        if conflict or concrete:
+            return conflict, concrete
+
+    return conflict, concrete
+
+
+
+
+
 
 
 

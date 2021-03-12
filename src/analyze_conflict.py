@@ -23,17 +23,10 @@ def analyze_conflict(program : AST, processed_core):
     lemma = BoolVal(False)
     d_levels = [0]
     s = Solver()
-    print("PROCESSED CORE")
-    print(processed_core)
     for (phi, node_id, chi_n) in processed_core:
-        print("TRYING TO CHECK")
-        print(f'{phi}, {node_id}, {chi_n}')
-        print(f"AVAILABLE NODES: {list(program.graph_.keys())}")
-        print(f"CURRENT HOLES: {[h.id for h in program.get_holes()]}")
         node = program.search(node_id)
         ret_type = node.non_terminal
         sigma = []
-        #print(ret_type)
         if not node.get_children():
            ops = [p for p in program.prods[ret_type] if not p[1]]
         else:
@@ -53,25 +46,17 @@ def analyze_conflict(program : AST, processed_core):
             chi_semantics = semantics(u, program.inputs)
             p = And(chi_semantics)
             modulo_conflict = Implies(p, q)
-            print("TESTING IMPLICATION")
-            print(modulo_conflict)
             s.add(Not(modulo_conflict))
             result = s.check()
             equiv_modulo_conflict = result == unsat
             s.pop()
             if equiv_modulo_conflict:
-                print("MODULO CONFLICT")
                 sigma.append(Not(encode(node, op)))
-        print(sigma)
         # if the lemma will include the node, add decision level
         if sigma:
             d_levels.append(node.d_level)
             lemma = Or(lemma, And(sigma))
-    # return the learned lemma
-    print("LEARNED LEMMA")
-    pp(simplify(lemma))
-    print("DECISION LEVELS")
-    print(d_levels)
+    # return the learned lemma, and the backtrack levels
     return [lemma], d_levels
 
 

@@ -78,8 +78,8 @@ def check_conflict(program : AST, constraints):
     #print("INPUTS")
     #print(program.inputs)
     program_smt = infer_spec(program.root, program.inputs)
-    print("PROGRAM SPEC")
-    print(program_smt)
+    #print("PROGRAM SPEC")
+    #print(program_smt)
     # flatten list of specs
 
     s = Solver()
@@ -91,25 +91,16 @@ def check_conflict(program : AST, constraints):
         io_spec = abstr_map['sym_inputs'] + abstr_map['sym_outputs']
         s.add(io_spec)
         result = s.check()
+        s.pop()
         if result == unsat:
-            #print("UNSAT")
             s.pop()
-            s.pop()
-            #print("SHOULD BE FRESH")
-            #print(s)
             enc = program_smt['program_spec'] + io_spec
             s.check(enc)
             unsat_core = s.unsat_core()
             #print(unsat_core)
             processed_core = process_core(unsat_core, program_smt, io_spec)
             return processed_core
-        else:
-            #print("CONSTRAINTS")
-            #print(s)
-            #print("MODEL")
-            #print(s.model())
-            s.pop()
-    #print("FEASIBLE")
+
     return []
 
 

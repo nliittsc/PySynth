@@ -7,7 +7,7 @@ from src.interpreter import interpreter
 from copy import deepcopy, copy
 import time
 
-from src.propogate import propogate1, propogate2, simple_propogate
+from src.propogate import propogate1, propogate2, simple_propogate, copy_propogate
 from src.semantics import sem, infer_spec
 import numpy as np
 import random
@@ -125,6 +125,7 @@ class NodeTrail:
 # This is inefficient, but maintain the trail is hard
 def backtrack(decision_map, d_level):
     program = deepcopy(decision_map[d_level])
+    program.d_level = d_level
     return program
 
 
@@ -142,7 +143,7 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
                                  and p[0] != 'str.replace']
     program.prods['ntInt'] = [p for p in program.prods['ntInt']
                               if p[0] != 'str.to.int']
-    timeout = 200
+    timeout = 60
     elapsed_time = 0
     num_conflicts = 0
     num_rounds = 1
@@ -164,11 +165,15 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
         # decision_map[0] = copy(program.work_list)
         # simplify knowledge base to help running time
         while not program.is_concrete() and elapsed_time < timeout:
+
+            # Randomized Restarting.
+            if num_conflicts > 50 or random.uniform(0, 1) < 0.05:
+                break
+
             print("ELAPSED TIME:")
             elapsed_time = time.time() - start_time
             print(elapsed_time)
-            print("WORKER LIST")
-            print([(d, h) for d, h in program.work_list])
+
             d_level, hole_id = program.work_list.pop()
             hole = program.search(hole_id)
             program.d_level = d_level
@@ -179,16 +184,16 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
                 # no consistent production, so we restart until
                 # there is a better backtracking strategy
                 break
-            print(f"PRODUCTION APPLIED: {production[0]}")
 
             # simple fill for now
-            conflict, concrete = simple_propogate(program, (hole, production), knowledge_base, d_level, NodeTrail())
+            #conflict, concrete = simple_propogate(program, (hole, production), knowledge_base, d_level, NodeTrail())
+            conflict, concrete = copy_propogate(program, (hole, production), knowledge_base)
             print("CURRENT PROGRAM")
             program.print()
-            print(f"CURRENT HOLES: {[h.id for h in program.get_holes()]}")
-            print(f"CURRENT WORKER LIST: {[(d, h) for d, h in program.work_list]}")
+            # store the program state
+            decision_map[program.d_level] = deepcopy(program)
             if conflict:  # program is not consistent with knowledge base, backtrack
-                break   # TODO: fix backtracking
+                break   # TODO: fix backtracking. Hard restart for now.
                 # s = Solver()
                 # while conflict:
                 #     s.push()
@@ -206,19 +211,18 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
             unsat_core = check_conflict(program, constraints)
             if unsat_core:  # A conflict was detected
                 print("Conflict detected")
-                # learn a lemma for the knowledge base and get the conflicts for
-                # backtracking
+                # learn a lemma for the knowledge base and get the conflicts for backtracking.
+                num_conflicts += 1
                 lemma, conflicts = analyze_conflict(program, unsat_core)
                 knowledge_base += lemma
+                print(f"Decision levels: {conflicts}")
+                print(f"Decision Map Levels: {list(decision_map.keys())}")
                 d_level = get_decision_level(conflicts)  # we backtrack to this level
+                print(f"Decision level: {d_level}")
                 # BACKTRACK STEP
                 program = backtrack(decision_map, d_level)
                 program.d_level = d_level
-                print("PROGRAM AFTER BACKTRACKING")
-                program.print()
 
-            # store the program state
-            decision_map[d_level] = deepcopy(program)
 
             if program.is_concrete():
                 results = interpreter(program, constraints)
