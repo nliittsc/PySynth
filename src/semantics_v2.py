@@ -112,7 +112,7 @@ semantics_map = {
     # at or after offset
     'str.indexof': [
         o_int < x1_len,
-        0 <= o_int,
+        -1 <= o_int,
         0 < x1_len,
         0 < x2_len,
         x2_len <= x1_len,

@@ -194,6 +194,8 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
             # store the program state
             decision_map[program.d_level] = deepcopy(program)
             if conflict:  # program is not consistent with knowledge base, backtrack
+                d_level = 0
+                program = decision_map[d_level]
                 break   # TODO: fix backtracking. Hard restart for now.
                 # s = Solver()
                 # while conflict:
