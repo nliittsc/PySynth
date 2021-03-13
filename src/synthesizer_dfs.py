@@ -179,10 +179,10 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
             print(f"DECISION LEVEL {d_level}, HOLE: {hole_id}")
             hole = program.search(hole_id)
             print(f"NODE {hole.id} is a hole: {hole.is_hole()}, is empty: {hole.is_empty()}")
-            program.d_level = d_level
             assert(hole.is_hole() is True)
             # select a production
             production = program.decide(hole, knowledge_base)
+            program.d_level += 1  # Update decision level.
             if production is None:
                 # no consistent production, so we restart until
                 # there is a better backtracking strategy
@@ -196,21 +196,23 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
             # store the program state
             decision_map[program.d_level] = deepcopy(program)
             if conflict:  # program is not consistent with knowledge base, backtrack
-                d_level = 0
-                program = decision_map[d_level]
-                break   # TODO: fix backtracking. Hard restart for now.
-                # s = Solver()
-                # while conflict:
-                #     s.push()
-                #     d_level, node_id = trail.pop()
-                #     program.make_hole_(node_id)
-                #     sat_problem = program.encode() + knowledge_base
-                #     s.add(sat_problem)
-                #     conflict = s.check() == unsat
-                #     s.pop()
+                #d_level = 0
+                #program = decision_map[d_level]
+                #break   # TODO: fix backtracking. Hard restart for now.
+                s = Solver()
+                d_level = program.d_level
+                while conflict:
+                    s.push()
+                    d_level -= 1
+                    program = deepcopy(decision_map[d_level])
+                    sat_problem = program.encode() + knowledge_base
+                    s.add(sat_problem)
+                    conflict = s.check() == unsat
+                    s.pop()
+                # no more conflict. Store decision level
+                program.d_level = d_level
+                continue
 
-            # update decision level
-            program.d_level = d_level
 
             # made it this it far. Check for conflicts
             unsat_core = check_conflict(program, constraints)

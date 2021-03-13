@@ -62,7 +62,6 @@ def copy_propogate(program: AST, hp_pair, knowledge_base):
         return conflict, False
 
     # no conflict, can fill hole
-    program.d_level += 1
     program.fill(hole.id, production)
     update_work_list(program, hole.id)
 
