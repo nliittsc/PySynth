@@ -3,7 +3,7 @@ from src.ast import AST, Node
 from src.analyze_conflict import naive_analyze_conflict, analyze_conflict
 from src.check_conflict import check_conflict
 from src.decide import decide, is_consistent
-from src.interpreter import interpreter
+from src.interpreter import interpreter, smt_interpreter
 from copy import deepcopy, copy
 import time
 
@@ -232,8 +232,9 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
 
 
             if program.is_concrete():
-                results = interpreter(program, constraints)
-                verified = results['verified']
+                #results = interpreter(program, constraints)
+                #verified = results['verified']
+                verified = smt_interpreter(program, constraints)
                 if verified:
                     print("SATISFYING PROGRAM FOUND")
                     program.print()

@@ -1,8 +1,100 @@
 from src.ast import AST, Node
+import src.semantics_v2
+from z3 import *
 
 # converts a sygus substring expression to a python equivalent
 def substr(s: str, start: int, count: int):
     return s[start:start+count]
+
+
+def generate_problem_spec(abstr_map):
+    outputs = [String('output') == StringVal(abstr_map['raw_outputs'][0][1])]
+    inputs = [String(x) == StringVal(s) for x, s in abstr_map['raw_inputs']]
+    return inputs, outputs
+
+def smt_interpreter(program: AST, constraints):
+    smt_formula = to_smt(program.to_program())
+    s = Solver()
+    num_passed = 0
+    num_test = len(constraints)
+    for i, abstr_map in enumerate(constraints):
+        s.push()
+        inputs, outputs = generate_problem_spec(abstr_map)
+        prog_spec = [String('output') == smt_formula]
+        s.add(inputs)
+        s.add(outputs)
+        s.add(prog_spec)
+        passed = s.check() == sat
+        s.pop()
+        if passed:
+            print(f"TEST {i} PASSED")
+            num_passed += 1
+        else:
+            print(f"TEST {i} FAILED")
+
+    print(f"{num_passed} / {num_test} TESTS PASSED")
+    if num_passed == num_test:
+        print("ALL TESTS PASSED!")
+        print("PROGRAM VERIFIED")
+    return num_passed == num_test
+
+
+
+
+
+# Convert the program s-expression into an SMT formula
+def to_smt(sexpr):
+    if isinstance(sexpr, str):
+        if sexpr[0] == '"' and sexpr[-1] == '"':
+            if len(sexpr[1:-1]) == 0:
+                return StringVal("")
+            else:
+                return StringVal(sexpr[1:-1])
+        else:
+            return String(sexpr)
+    if isinstance(sexpr, int):
+        return IntVal(sexpr)
+
+    if isinstance(sexpr, list):
+        f = sexpr[0]
+        if f == 'str.++':
+            s1 = to_smt(sexpr[1][0])
+            s2 = to_smt(sexpr[1][1])
+            return Concat(s1, s2)
+        if f == 'str.substr':
+            s = to_smt(sexpr[1][0])
+            offset = to_smt(sexpr[1][1])
+            length = to_smt(sexpr[1][2])
+            return SubString(s, offset, length)
+        if f == 'str.indexof':
+            s = to_smt(sexpr[1][0])
+            substr = to_smt(sexpr[1][1])
+            offset = to_smt(sexpr[1][2])
+            return IndexOf(s, substr, offset)
+        if f == 'str.at':
+            s = to_smt(sexpr[1][0])
+            pos = to_smt(sexpr[1][1])
+            return SubString(s, pos, IntVal(1))
+        if f == 'str.len':
+            s = to_smt(sexpr[1][0])
+            return Length(s)
+        if f == '+':
+            n1 = to_smt(sexpr[1][0])
+            n2 = to_smt(sexpr[1][1])
+            return n1 + n2
+        if f == '-':
+            n1 = to_smt(sexpr[1][0])
+            n2 = to_smt(sexpr[1][1])
+            return n1 - n2
+
+
+
+
+
+
+
+
+
 
 
 def recur_descent(sexpr):

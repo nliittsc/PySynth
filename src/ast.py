@@ -355,7 +355,7 @@ class AST:
             closers = [p for p in consistent_productions if not p[1]]
             expanders = [p for p in consistent_productions if p[1]]
             prob = random.uniform(0,1)
-            if prob < 0.75:  # bias greedy choices
+            if prob < 0.80:  # bias greedy choices
                 if closers:
                     return random.choice(closers)
                 else:

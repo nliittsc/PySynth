@@ -71,7 +71,7 @@ semantics_map = {
         0 < x1_len,
         x3 <= x1_len - x2
     ],
-    # (str.at String Int String)
+    # (str.at String Int)
     # Singleton string containing a character at given position
     # or empty string when position is out of range.
     # The leftmost position is 0.
