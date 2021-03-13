@@ -266,7 +266,11 @@ class AST:
     # Also will maintain the set of leaves/internals/holes/adj.list
     def fill(self, id: int, p: Production):
         v: Node = self.search(id, return_copy=False)
-        assert(v.is_hole() is True)  # This should never fail
+        #assert(v.is_hole() is True)  # This should never fail
+        if not v.is_hole():
+            nt = v.non_terminal
+            v.make_empty_()
+            v.make_notempty_(nt)
         if self.max_height < v.d + 1:
             self.nodes_at_depth[v.d + 1] = set()
             self.max_height += 1

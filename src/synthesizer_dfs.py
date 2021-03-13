@@ -143,7 +143,7 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
                                  and p[0] != 'str.replace']
     program.prods['ntInt'] = [p for p in program.prods['ntInt']
                               if p[0] != 'str.to.int']
-    timeout = 300
+    timeout = 360
     elapsed_time = 0
     num_conflicts = 0
     num_rounds = 1
@@ -168,7 +168,7 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
         while not program.is_concrete() and elapsed_time < timeout:
 
             # Randomized Restarting.
-            if num_conflicts > 50 or random.uniform(0, 1) < 0.05:
+            if num_conflicts > 50 and random.uniform(0, 1) < 0.10:
                 break
 
             print("ELAPSED TIME:")
@@ -179,7 +179,7 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
             print(f"DECISION LEVEL {d_level}, HOLE: {hole_id}")
             hole = program.search(hole_id)
             print(f"NODE {hole.id} is a hole: {hole.is_hole()}, is empty: {hole.is_empty()}")
-            assert(hole.is_hole() is True)
+            #assert(hole.is_hole() is True)
             # select a production
             production = program.decide(hole, knowledge_base)
             program.d_level += 1  # Update decision level.
