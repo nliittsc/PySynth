@@ -13,6 +13,8 @@ def update_work_list(program, node_id):
     for w in v.get_children():
         workers.insert(0, (program.d_level, w.id))
     program.work_list += workers
+    print("NEW WORKLIST")
+    print(program.work_list)
 
 
 def simple_propogate(program : AST, hp_pair, knowledge_base, d_level, trail):

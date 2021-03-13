@@ -50,41 +50,40 @@ semantics_map = {
     # string concat function
     'str.++': [
         o_len == x1_len + x2_len,
-        x1_len < o_len,
-        x2_len < o_len,
+        0 < o_len,
         0 < x1_len,
         0 < x2_len,
+        x1_len < o_len,
+        x2_len < o_len,
         o_head == x1_head,
         o_last == x2_last,
-        x1_max <= o_max,
-        x2_max <= o_max
     ],
-    # takes a string x1, a start x2, a count (length) x3, returns substring
+    # (str.substr s i n) evaluates to the longest (unscattered) substring
+    # of s of length at most n starting at position i.
+    # It evaluates to the empty string if n is negative or i is not in
+    # the interval [0,l-1] where l is the length of s.
     'str.substr': [
         o_len == x3,
+        0 < o_len,
         o_len < x1_len,
+        0 < x3,
+        x3 < x1_len,
+        0 < x1_len,
+        x3 <= x1_len - x2
+    ],
+    # (str.at String Int String)
+    # Singleton string containing a character at given position
+    # or empty string when position is out of range.
+    # The leftmost position is 0.
+    'str.at': [
+        o_len <= 1,
         0 <= o_len,
         0 < x1_len,
         0 <= x2,
-        x2 < x1_len,
-        0 < x3,
-        x3 <= x1_len - x2,
-        o_min >= x1_min,
-        o_max <= x1_max,
-        o_head <= x1_max,
-        o_last <= x1_max,
-    ],
-    # returns the character at a given index
-    'str.at': [
-        o_len == 1,
-        0 < x1_len,
-        0 <= x2,
-        x2 < x1_len,
-        o_min >= x1_min,
-        o_max <= x1_max,
-        o_head <= x1_max,
-        o_last <= x1_max,
-        #o_len < x1_len
+        #x2 < x1_len,
+        o_len < x1_len,
+        Implies(x2 >= x1_len, o_len == 0),
+        Implies(x2 < x1_len, o_len == 1)
     ],
     'int.to.str': [
 
@@ -108,18 +107,23 @@ semantics_map = {
         0 < x1_len,
     ],
     'str.to.int': [],
-    # retrieve the index of the first occur of substr in string
-    # at or after offset
+    # From the docs:
+    # Index of first occurrence of second string in first one starting at
+    # the position specified by the third argument.
+    #  (str.indexof s t i), with 0 <= i <= |s| is the position of the first
+    # occurrence of t in s at or after position i, if any.
+    # Otherwise, it is -1. Note that the result is i whenever i is within
+    # the range [0, |s|] and t is empty.
+    # Note(nathan): Following the paper s, t, i are x1, x2, x3 here.
     'str.indexof': [
         o_int < x1_len,
-        -1 <= o_int,
+        0 <= o_int,
         0 < x1_len,
-        0 < x2_len,
-        x2_len <= x1_len,
+        0 <= x2_len,
+        x2_len < x1_len,
         0 <= x3,
         x3 < x1_len,
         x3 <= o_int,
-
     ],
     #'int.literal': [],
 

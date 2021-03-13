@@ -176,7 +176,9 @@ def synthesize(max_iter: int, fun_dict, constraints, var_decls):
             print(elapsed_time)
 
             d_level, hole_id = program.work_list.pop()
+            print(f"DECISION LEVEL {d_level}, HOLE: {hole_id}")
             hole = program.search(hole_id)
+            print(f"NODE {hole.id} is a hole: {hole.is_hole()}, is empty: {hole.is_empty()}")
             program.d_level = d_level
             assert(hole.is_hole() is True)
             # select a production
