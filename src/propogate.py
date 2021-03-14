@@ -7,6 +7,51 @@ import numpy as np
 import random
 
 
+def propogate(program, knowledge_base):
+    # check consistency with knowledge base
+    s = Solver()
+    s.push()
+    sat_problem = And(program.encode() + knowledge_base)
+    s.add(sat_problem)
+    conflict = s.check() == unsat
+    s.pop()
+    concrete = program.is_concrete()
+    if conflict or concrete:
+        return conflict, concrete
+    holes = program.get_holes()
+    prods = program.prods
+    holes_x_prods = [(h, p) for h in holes
+                     for p in prods[h.non_terminal]]
+    # check if current knowledge base implies any assignments
+    for hi, pi in holes_x_prods:
+        s.push()
+        possible_fills = Or([encode(hi, pj) for pj in prods[hi.non_terminal]])
+        hypothesis = And(sat_problem, possible_fills)
+        unit_fill = encode(hi, pi) == BoolVal(True)
+        f = Implies(hypothesis, unit_fill)
+        s.add(Not(f))
+        should_propogate = s.check() == unsat
+        s.pop()
+        if should_propogate:
+            program.fill(hi.id, pi)
+            conflict, concrete = propogate(program, knowledge_base)
+
+        if conflict or concrete:
+            break
+
+    return conflict, concrete
+
+
+
+
+
+
+
+
+
+
+
+
 def update_work_list(program, node_id):
     v = program.search(node_id)
     workers = []

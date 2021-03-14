@@ -31,8 +31,8 @@ def encode(node, production):
 # production rule. Empty nodes are required to maintain algorithm invariants
 class Node:
     def __init__(self, k=0,d=0,i=0):
-        self.non_terminal = None
-        self.production = None
+        self.non_terminal = ''
+        self.production = ''
         self.k = k
         self.d = d
         self.i = i
@@ -47,12 +47,12 @@ class Node:
     # indicates whether a given node is an "empty" node
     # or if it is "live", meaning it has a non-terminal
     def is_empty(self):
-        return self.non_terminal is None
+        return self.non_terminal == ''
 
     # makes the node empty
     def make_empty_(self, max_height=0):
-        self.non_terminal = None
-        self.production = None
+        self.non_terminal = ''
+        self.production = ''
 
     # Makes a node "live" by applying a non-terminal.
     def make_notempty_(self, non_terminal):
@@ -64,14 +64,14 @@ class Node:
     def make_k_children_(self):
         self.children = [Node(k=self.k, d=self.d+1, i=self.k*(self.i-1) + j + 1)
                          for j in range(self.k)]
-        self.children_ids = {label(self.k, self.d+1, self.i+j) for j in range(self.k)}
+        #self.children_ids = {label(self.k, self.d+1, self.i+j) for j in range(self.k)}
 
 
     # Checks if a given node is a hole or not.
     # A node is a hole if it does not have a production rule applied.
     def is_hole(self) -> bool:
-        has_no_production = self.production is None
-        is_not_empty = not self.is_empty()
+        has_no_production = self.production == ''
+        is_not_empty = self.non_terminal != ''
         return has_no_production and is_not_empty
 
 
@@ -183,19 +183,6 @@ class AST:
         self.nodes_at_depth[1].add(self.root)
         self.holes.add(r.id)
 
-    # Increase the  height of the AST, and spawn
-    # empty children beneath the current height.
-    def increase_height_(self):
-        k = self.arity
-        d = self.max_height
-        self.nodes_at_depth[d+1] = set()
-        for i, node in enumerate(self.nodes_at_depth[d]):
-            node.make_k_children_()
-            for w in node.children:  # constant time w.r.t. max-arity
-                self.graph_[w.id] = w
-                self.nodes_at_depth[d+1].add(w)
-        self.max_height += 1
-        print(f"new children at height {d+1}: {[v.id for v in self.nodes_at_depth[d+1]]}")
 
     # 'Delete' a node in the AST by making it an empty node
     # Does the same to all its children
@@ -203,25 +190,21 @@ class AST:
     # and all its children to be considered empty
     # This should *not* affect the node ids (thats our invariant)
     def delete_node_(self, id: int):
-        node: Node = self.search(id, return_copy=False)
-        queue = [node]
-        while queue:
-            v = queue.pop(0)
-            v.make_empty_()
-            assert(v.is_empty() is True)
-            for w in v.children:
-                if not w.is_empty():  # we dont traverse holes
-                    queue.append(w)
+        self.graph_[id].non_terminal = ''
+        self.graph_[id].production = ''
 
     # Takes a node, and makes it into a hole (as opposed to empty)
     def make_hole_(self, id:int):
-        node = self.search(id)
-        non_terminal = node.non_terminal
+        v = self.graph_[id]
+        nt = v.non_terminal
         self.delete_node_(id)
-        node = self.search(id, return_copy=False)
-        node.non_terminal = non_terminal
+        self.graph_[id].non_terminal = nt
+        #print(f"NODE {id}, hole: {self.search(id).is_hole()}")
+        #print(f"NODE {id}, hole: {self.search(id).non_terminal}")
+        #print(f"NODE {id}, hole: {self.search(id).production}")
         assert(self.search(id).is_empty() is False)
         assert(self.search(id).is_hole() is True)
+        self.search(id)
 
 
 
@@ -231,19 +214,13 @@ class AST:
     # TODO: is it better to maintain a list of holes or to just traverse AST?
     # Running time should be about the same?
     def get_holes(self, return_copy: Bool = True) -> list[Node]:
-        #holes = [v for k, v in self.graph.items() if k in self.holes]
-        #if return_copy:
-        #    return (deepcopy(holes))
-        #else:
-        #    return holes
-
         holes = []
         queue = [self.root]
         while queue:
             v = queue.pop(0)
             if v.is_hole():
                 holes.append(deepcopy(v))
-            for c in v.children:
+            for c in v.get_children():
                 queue.append(c)
         if return_copy:
             return deepcopy(holes)  # this might be slow
@@ -252,8 +229,6 @@ class AST:
 
     # note: default is to return a deep copy of the target node
     def search(self, id: int, return_copy: bool=True):
-        #print("SEARCHING")
-        #print(id)
         if return_copy:
             return deepcopy(self.graph_[id])
         else:
@@ -266,22 +241,18 @@ class AST:
     # Also will maintain the set of leaves/internals/holes/adj.list
     def fill(self, id: int, p: Production):
         v: Node = self.search(id, return_copy=False)
-        #assert(v.is_hole() is True)  # This should never fail
-        if not v.is_hole():
-            nt = v.non_terminal
-            v.make_empty_()
-            v.make_notempty_(nt)
+        assert(v.is_hole() is True)  # This should never fail
         if self.max_height < v.d + 1:
             self.nodes_at_depth[v.d + 1] = set()
             self.max_height += 1
 
-        v.apply_prod_(p)  # apply the production
-        for w in v.children:  # constant time w.r.t. max-arity
+        self.graph_[id].apply_prod_(p)  # apply the production
+        for w in self.graph_[id].get_children():  # constant time w.r.t. max-arity
             self.graph_[w.id] = w
             self.nodes_at_depth[v.d + 1].add(w)
 
 
-        v.d_level = self.d_level
+        self.graph_[id].d_level = self.d_level
 
 
         # queue = [self.root]
@@ -337,39 +308,10 @@ class AST:
             v = stack.pop(0)
             if not v.is_hole() and not v.is_empty():  # Can only encode nodes where a production is applied
                 encoded_vars.append(v.encode_node())
-                for c in v.children:
+                for c in v.get_children():
                     stack.append(c)
         # Return the conjunction of the boolean variables
         return encoded_vars
-
-    def decide(self, node: Node, knowledge_base) -> Production:
-        # Get productions consistent with the knowledge base
-        program_encoding = self.encode()
-        sat_problem = program_encoding + knowledge_base
-        s = Solver()
-        consistent_productions = [p for p in self.prods[node.non_terminal]
-                                  if sat == s.check(sat_problem + [encode(node, p)])]
-
-        # if no production can be applied, need to backtrack
-        if not consistent_productions:
-            return None
-        else:  # this strategy is random
-            #production = random.choice(consistent_productions)
-            #return production
-            closers = [p for p in consistent_productions if not p[1]]
-            expanders = [p for p in consistent_productions if p[1]]
-            prob = random.uniform(0,1)
-            if prob < 0.80:  # bias greedy choices
-                if closers:
-                    return random.choice(closers)
-                else:
-                    return random.choice(expanders)
-            else:
-                if expanders:
-                    return random.choice(expanders)
-                else:
-                    return random.choice(closers)
-
 
 
 
@@ -385,13 +327,11 @@ class AST:
                 return r.production
         else:
             children = []
-            for c in r.children:
-                if not c.is_empty():
-                    p = self.to_program(c)
-                    children.append(p)
+            for c in r.get_children():
+                p = self.to_program(c)
+                children.append(p)
+                print(c.production)
             return [r.production, children]
-
-
 
 
     # Can work on this more later

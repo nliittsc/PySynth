@@ -6,9 +6,6 @@ from copy import deepcopy
 implemented_grammar = ['str.++', 'str.substr', 'str.len', 'str.at', 'str.indexof',
                        '+', '-']
 
-# CONSTANTS
-ops = ['str.++', 'str.replace', 'str.at', 'int.to.str', 'str.substr', 'str.len',
-           'str.to.int', 'str.indexof', '+', '-', 'str.prefixof', 'str.suffixof']
 
 o_int = Int('o')
 o_str = String('o')
@@ -85,15 +82,8 @@ semantics_map = {
         Implies(x2 >= x1_len, o_len == 0),
         Implies(x2 < x1_len, o_len == 1)
     ],
-    'int.to.str': [
-
-    ],
-    'str.replace': [
-
-    ],
-    #'str.literal': [
-    #
-    #],
+    #'int.to.str': [],
+    #'str.replace': [],
 
     # int return types
     '+': [
@@ -106,7 +96,7 @@ semantics_map = {
         o_int == x1_len,
         0 < x1_len,
     ],
-    'str.to.int': [],
+    #'str.to.int': [],
     # From the docs:
     # Index of first occurrence of second string in first one starting at
     # the position specified by the third argument.
@@ -147,7 +137,7 @@ def semantics(node: Node, inputs):
     if isinstance(term, int):
         return [o_int == term]
 
-    if isinstance(term, str) and term not in ops:
+    if isinstance(term, str) and term not in semantics_map.keys():
         if term[0] == '"' and term[-1] == '"':
             if len(term[1:-1]) == 0:
                 return [
@@ -193,7 +183,7 @@ def semantics(node: Node, inputs):
                 x_max == Int(term + '.max'),
             ]
 
-    if isinstance(term, str) and term in ops:
+    if isinstance(term, str) and term in semantics_map.keys():
         return semantics_map[term]
 
 
