@@ -19,7 +19,7 @@ def naive_analyze_conflict(ast: AST, kappa, hp):
     lemmas = [Not(b)]
     return lemmas
 
-def analyze_conflict(program : AST, processed_core):
+def analyze_conflict(program : AST, processed_core, conflict_map):
     lemma = BoolVal(False)
     d_levels = [0]
     s = Solver()
@@ -27,13 +27,18 @@ def analyze_conflict(program : AST, processed_core):
         node = program.search(node_id)
         ret_type = node.non_terminal
         sigma = []
-        if not node.get_children():
-           ops = [p for p in program.prods[ret_type] if not p[1]]
+        if node_id not in conflict_map.keys():
+            conflict_map[node_id] = 1
         else:
-           a1_ak = {c.non_terminal for c in node.get_children()}
-
-           ops = [p for p in program.prods[ret_type]
-                  for a in a1_ak if a in p[1]]
+            conflict_map[node_id] += 1
+        # if not node.get_children():
+        #    ops = [p for p in program.prods[ret_type] if not p[1]]
+        # else:
+        #    a1_ak = {c.non_terminal for c in node.get_children()}
+        #
+        #    ops = [p for p in program.prods[ret_type]
+        #           for a in a1_ak if a in p[1]]
+        ops = [p for p in program.prods[ret_type]]
         q = And(phi)
         for op in ops:
             s.push()
@@ -57,7 +62,7 @@ def analyze_conflict(program : AST, processed_core):
             d_levels.append(node.d_level)
             lemma = Or(lemma, And(sigma))
     # return the learned lemma, and the backtrack levels
-    return [lemma], d_levels
+    return [lemma], d_levels, conflict_map
 
 
 

@@ -3,7 +3,8 @@ from src.parser import input_to_list, parse, get_grammar, parse_sygus
 #from src.synthesizer import *
 #from src.synthesizer_dfs import *
 #from src.synthesizer_enumerative import top_down_synthesize
-from src.synthesizer_v2 import cdcl_synthesize
+#from src.synthesizer_v2 import cdcl_synthesize
+from src.synthesizer_v3 import cdcl_synthesize
 from src.semantics import *
 from src.semantics_v2 import *
 
@@ -11,6 +12,7 @@ dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmar
 num_success = 0
 i = 0
 solved = []
+tried = []
 for f in os.listdir(dir):
     i += 1
     #if i > 5:
@@ -61,14 +63,16 @@ for f in os.listdir(dir):
         #print(spec)
         var_decls = problem['var_decls']
         was_success = False
-        timeout = 60
+        timeout = 120
         timer, was_success = cdcl_synthesize(timeout, fun_dict, spec, var_decls)
         if was_success:
             print("yay!")
             #program.print_program()
-            solved.append((timer, f))
+            solved.append(f)
+            tried.append((timer, f))
         else:
             print("Did not succeed")
+            tried.append((timer, f))
 
         num_success += was_success
 
@@ -76,9 +80,9 @@ print('*' * 10)
 print("number of found programs:")
 print(num_success)
 print("Found programs:")
-print([f for _, f in solved])
+print([f for f in solved])
 n = len(solved)
-sum = sum([t for t, _ in solved])
+sum = sum([t for t, _ in tried])
 mean = sum / n
 print(f"Average solve time: {round(mean, 2)}")
 

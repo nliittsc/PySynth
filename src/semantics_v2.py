@@ -61,6 +61,8 @@ semantics_map = {
     # the interval [0,l-1] where l is the length of s.
     'str.substr': [
         o_len == x3,
+        0 <= x2,
+        x2 < x1_len,
         0 < o_len,
         o_len < x1_len,
         0 < x3,
@@ -179,8 +181,6 @@ def semantics(node: Node, inputs):
                 x_len == Int(term + '.len'),
                 x_head == Int(term + '.head'),
                 x_last == Int(term + '.last'),
-                x_min == Int(term + '.min'),
-                x_max == Int(term + '.max'),
             ]
 
     if isinstance(term, str) and term in semantics_map.keys():

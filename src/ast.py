@@ -192,6 +192,8 @@ class AST:
     def delete_node_(self, id: int):
         self.graph_[id].non_terminal = ''
         self.graph_[id].production = ''
+        self.graph_[id].children = []
+        self.graph_[id].num_children = 0
 
     # Takes a node, and makes it into a hole (as opposed to empty)
     def make_hole_(self, id:int):
@@ -330,7 +332,6 @@ class AST:
             for c in r.get_children():
                 p = self.to_program(c)
                 children.append(p)
-                print(c.production)
             return [r.production, children]
 
 

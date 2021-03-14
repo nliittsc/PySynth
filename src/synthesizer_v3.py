@@ -16,20 +16,13 @@ import random
 # ranks a list of productions.
 # Currently biases productions with no children
 def rank_productions(productions):
-    np.random.shuffle(productions)
-    closers = [p for p in productions if not p[1]]
-    expanders = [p for p in productions if p[1]]
-    if random.uniform(0, 1) < 0.80:
-        if closers:
-            return closers
-        else:
-            return expanders
-    else:
-        if expanders:
-            return expanders
-        else:
-            return closers
-    return productions
+    return sorted(productions, key=lambda p: len(p[1]))
+
+# rank the set of non-terminals (holes) by
+# choosing the deepest hole
+def rank_non_terminals(program: AST, conflict_map):
+    hole_ids = [h.id for h in program.get_holes()]
+    return hole_ids
 
 def decide(program, knowledge_base, conflict_map):
     hole_id = rank_non_terminals(program, conflict_map).pop(0)
@@ -40,7 +33,7 @@ def decide(program, knowledge_base, conflict_map):
     consistent_productions = [p for p in productions
                               if not unsat == s.check(sat_problem + [encode(hole, p)])]
     ranked_productions = rank_productions(consistent_productions)
-    return hole_id, ranked_productions.pop(0)
+    return hole_id, ranked_productions
 
 
 # returns the second highest decision level
@@ -55,15 +48,6 @@ def get_decision_level(d_levels):
         else:
             return max(d_levels)
 
-# rank the set of non-terminals (holes) by
-# choosing the deepest hole
-def rank_non_terminals(program: AST, conflict_map):
-    hole_ids = [h.id for h in program.get_holes()]
-    for h in hole_ids:
-        if h not in conflict_map.keys():
-            conflict_map[h] = 0
-    sorted(hole_ids, key=lambda i: conflict_map[i], reverse=False)
-    return hole_ids
 
 class Trail:
     def __init__(self):
@@ -147,9 +131,9 @@ def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
     num_restarts = 0
     #decision_level = 0
     program.decision_level = 0
-    queue = [deepcopy(program)]
     trail = Trail()
     trail.push(0, 1)
+    queue = [(deepcopy(program), deepcopy(trail.trail))]
     start_time = time.time()
     conflict_map = {1: 0}
     # Program synthesis loop.
@@ -164,48 +148,34 @@ def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
             print("CURRENT PROGRAM")
             prog.print()
 
-        if num_conflicts > 50:
-            num_conflicts = 0
-            prog = deepcopy(program)
-            trail = Trail()
-            trail.push(0, 1)
+        # get a program
+        prog, trail_ = queue.pop(0)
+        trail.trail = trail_
+
         if prog.is_concrete():
             verified = smt_interpreter(prog, constraints)
             if verified:
                 elapsed_time = time.time() - start_time
                 return elapsed_time, True
-            else:
-                prog = deepcopy(program)
-                trail = Trail()
-                trail.push(0, 1)
+
+            else:  # want to block this program
+                enc = prog.encode()
+                knowledge_base.append(Not(And(enc)))
+                #prog = deepcopy(program)
+                #trail = Trail()
+                #trail.push(0, 1)
+                #queue.append((prog, deepcopy(trail.trail)))
         else:
             conflict, concrete = propogate(prog, knowledge_base, trail)
             if conflict:
                 print("SAT BACKTRACK")
                 num_conflicts += 1
                 prog = trail.sat_backtrack(prog, knowledge_base)
+                queue.append((deepcopy(prog), deepcopy(trail.trail)))
+
             elif concrete:
                 print("CONCRETE OFF PROPOGATE")
-                continue
-
-            # no conflicts from propogate. Move on to decide phase
-            hole_id, production = decide(prog, knowledge_base, conflict_map)
-            prog.d_level += 1
-            trail.push(prog.d_level, hole_id)
-            prog.fill(hole_id, production)
-            if production[0] == 'str.substr':
-                v = prog.search(hole_id)
-                c = v.get_children()[0]
-                prods_ = [p for p in prog.prods[c.non_terminal] if not p[1]]
-                p = random.choice(prods_)
-                prog.fill(c.id, p)
-                trail.push(prog.d_level, c.id)
-
-            conflict, concrete = propogate(prog, knowledge_base, trail)
-            if conflict:
-                print("SAT BACKTRACK")
-                num_conflicts += 1
-                prog = trail.sat_backtrack(prog, knowledge_base)
+                queue.insert(0, (prog, trail.trail))
 
             # Now check if production produced any conflicts with spec
             unsat_core = check_conflict(prog, constraints)
@@ -215,8 +185,20 @@ def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
                 lemma, conflicts, conflict_map = analyze_conflict(prog, unsat_core, conflict_map)
                 knowledge_base += lemma
                 d_level = get_decision_level(conflicts)
-                #print(f"d level and trail: {d_level} / {trail.trail}")
+                # print(f"d level and trail: {d_level} / {trail.trail}")
                 prog = trail.backtrack(d_level, prog)
+
+            # no conflicts from propogate. Move on to decide phase
+            hole_id, productions = decide(prog, knowledge_base, conflict_map)
+            prog.d_level += 1
+            w1 = []
+            for p in productions:
+                prog0 = deepcopy(prog)
+                trail0 = deepcopy(trail)
+                prog0.fill(hole_id, p)
+                trail0.push(prog0.d_level, hole_id)
+                w1.append((prog0, trail0.trail))
+            queue = queue + w1
 
         num_rounds += 1
         knowledge_base = [simplify(And(knowledge_base))]
