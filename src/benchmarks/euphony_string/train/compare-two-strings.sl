@@ -1,4 +1,3 @@
-0; https=//exceljet.net/formula/compare-two-strings
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String) (_arg_1 String)) Bool 
  ( (Start Bool (ntBool)) 

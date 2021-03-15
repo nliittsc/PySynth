@@ -8,6 +8,10 @@ Expr = (Atom, List)
 
 def input_to_list(string: str) -> [str]:
     "Parse a .sl file into a list of S-Expressions."
+    s = string.split('\n')
+    if s[0][0] == ';':
+        string = "".join(s[1:])
+
     n: int = 0
     result: [str] = []
     s: str = ""
@@ -194,7 +198,11 @@ def parse_constraint(cmd):
     # this can be mapped to semantics later
     return cmd[1]
 
-
+def parse_define_fun(lines: [str]):
+    s_exprs = [parse(l) for l in lines if l != ' ']
+    for s in s_exprs:
+        if s[0] == 'define-fun':
+            return s
 
 # Simple SyGus parser
 def parse_sygus(lines: [str]):

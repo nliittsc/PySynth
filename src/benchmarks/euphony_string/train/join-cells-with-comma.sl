@@ -1,4 +1,3 @@
-; https=//exceljet.net/formula/join-cells-with-comma
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String) (_arg_1 String) (_arg_2 String)) String 
  ( (Start String (ntString)) 

@@ -1,4 +1,3 @@
-; https=//exceljet.net/formula/get-domain-from-email-address
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String) (_arg_1 String)) String 
  ( (Start String (ntString)) 

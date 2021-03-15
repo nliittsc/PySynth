@@ -1,4 +1,3 @@
-; https=//exceljet.net/formula/convert-text-to-numbers
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String)) Int 
  ( (Start Int (ntInt)) 

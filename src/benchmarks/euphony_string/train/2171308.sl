@@ -1,4 +1,3 @@
-; https=//stackoverflow.com/questions/2171308/how-to-make-a-sub-string-selection-and-concatenation-in-excel
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String)) String 
  ( (Start String (ntString)) 

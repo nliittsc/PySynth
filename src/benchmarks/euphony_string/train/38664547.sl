@@ -1,4 +1,3 @@
-; https=//stackoverflow.com/questions/38664547/how-to-find-specific-substrings-in-excel-spreadsheet
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String)) String 
  ( (Start String (ntString)) 

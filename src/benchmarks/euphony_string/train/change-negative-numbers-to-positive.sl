@@ -1,4 +1,3 @@
-; https=//exceljet.net/formula/change-negative-numbers-to-positive
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String)) String 
  ( (Start String (ntString)) 

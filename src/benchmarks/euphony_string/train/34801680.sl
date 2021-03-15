@@ -1,4 +1,3 @@
-; https=//stackoverflow.com/questions/34801680/remove-a-recurring-substring-from-an-entire-column-excel-vba
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String)) String 
  ( (Start String (ntString)) 

@@ -1,4 +1,3 @@
-; https=//stackoverflow.com/questions/41503046/find-string-in-substring-with-vlookup-in-excel
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String)) String 
  ( (Start String (ntString)) 

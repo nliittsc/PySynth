@@ -1,4 +1,3 @@
-; https=//stackoverflow.com/questions/11440431/remove-trailing-us-and-can-strings-from-a-range-of-cells/11440731%11440731
 (set-logic SLIA)
 (synth-fun f ((_arg_0 String)) String 
  ( (Start String (ntString)) 
