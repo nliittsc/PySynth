@@ -96,10 +96,10 @@ class Trail:
                 d_level0, node_id = self.peek()
                 if d_level0 > d_level:
                     self.pop()
-                    print(f"dlevel0: {d_level0} / dlevel: {d_level}")
+                    #print(f"dlevel0: {d_level0} / dlevel: {d_level}")
                     program.make_hole_(node_id)
                     assert (program.search(node_id).is_hole() is True)
-                    print(f"POPPED {(d_level0, node_id)}")
+                    #print(f"POPPED {(d_level0, node_id)}")
                 else:
                     break
             if not self.trail:
@@ -139,14 +139,14 @@ def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
     # Program synthesis loop.
     prog = deepcopy(program)
     while True:
+        knowledge_base = [simplify(And(knowledge_base))]
         elapsed_time = time.time() - start_time
+        if num_rounds % 10 == 0:
+            print(f"ELAPSED TIME: {elapsed_time}")
+
         if elapsed_time > timeout:
             print("TIMEOUT")
             return timeout, False
-
-        if True:
-            print("CURRENT PROGRAM")
-            prog.print()
 
         # get a program
         prog, trail_ = queue.pop(0)
@@ -168,19 +168,19 @@ def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
         else:
             conflict, concrete = propogate(prog, knowledge_base, trail)
             if conflict:
-                print("SAT BACKTRACK")
+                #print("SAT BACKTRACK")
                 num_conflicts += 1
                 prog = trail.sat_backtrack(prog, knowledge_base)
                 queue.append((deepcopy(prog), deepcopy(trail.trail)))
 
             elif concrete:
-                print("CONCRETE OFF PROPOGATE")
+                #print("CONCRETE OFF PROPOGATE")
                 queue.insert(0, (prog, trail.trail))
 
             # Now check if production produced any conflicts with spec
             unsat_core = check_conflict(prog, constraints)
             if unsat_core:  # False = empty unsat core = no conflict
-                print("BACKTRACKING")
+                #print("BACKTRACKING")
                 num_conflicts += 1
                 lemma, conflicts, conflict_map = analyze_conflict(prog, unsat_core, conflict_map)
                 knowledge_base += lemma
@@ -201,7 +201,7 @@ def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
             queue = queue + w1
 
         num_rounds += 1
-        knowledge_base = [simplify(And(knowledge_base))]
+
 
 
 

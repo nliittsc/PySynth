@@ -66,14 +66,15 @@ def top_down_synthesize(timeout, fun_dict, constraints, var_decls):
     program.prods['ntString'] = [p for p in program.prods['ntString']
                                  if p[0] != 'int.to.str'
                                  and p[0] != 'str.replace'
-                                 and p[0] != 'str.prefixof'
-                                 and p[0] != 'str.suffixof'
-                                 and p[0] != 'str.contains'
-                                 and p[0] != 'true'
-                                 and p[0] != 'false'
                                  and p[0] != 'ite']
     program.prods['ntInt'] = [p for p in program.prods['ntInt']
                               if p[0] != 'str.to.int']
+    program.prods['ntBool'] = [p for p in program.prods['ntBool']
+                               if p[0] != 'str.prefixof'
+                                 and p[0] != 'str.suffixof'
+                                 and p[0] != 'str.contains'
+                                 and p[0] != 'true'
+                                 and p[0] != 'false']
 
     start_time = time.time()
     # Program synthesis loop.
@@ -86,16 +87,16 @@ def top_down_synthesize(timeout, fun_dict, constraints, var_decls):
             return timeout, False
 
         prog = queue.pop(0)
-        if i % 50 == 0:
+        if i % 100 == 0:
             print(f"ELAPSED TIME {elapsed_time}")
-            print("CURRENT PROGRAM")
-            prog.print()
+            #print("CURRENT PROGRAM")
+            #prog.print()
         if prog.is_concrete():
-            print("VERIFYING:")
-            prog.print()
+            #print("VERIFYING:")
+            #prog.print()
             verified = smt_interpreter(prog, constraints)
             if verified:
-                print("PROGRAM VERIFIED")
+                #print("PROGRAM VERIFIED")
                 elapsed_time = time.time() - start_time
                 return elapsed_time, True
         else:

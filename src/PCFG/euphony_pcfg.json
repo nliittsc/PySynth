@@ -1,0 +1,1 @@
+{"ntString": {"str.++": 142, "str.replace": 25, "str.at": 14, "int.to.str": 2, "ite": 11, "str.substr": 50, "literal": 182, "input": 203}, "ntInt": {"+": 14, "-": 10, "str.len": 19, "str.to.int": 3, "ite": 1, "str.indexof": 21, "literal": 111, "input": 1}, "ntBool": {"=": 1, "str.prefixof": 4, "str.suffixof": 9, "str.contains": 1, "true": 1, "false": 1}, "total_counts": 826}

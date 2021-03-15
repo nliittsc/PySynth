@@ -27,12 +27,12 @@ def smt_interpreter(program: AST, constraints):
         passed = s.check() == sat
         s.pop()
         if passed:
-            print(f"TEST {i} PASSED")
+            #print(f"TEST {i} PASSED")
             num_passed += 1
-        else:
-            print(f"TEST {i} FAILED")
+        #else:
+            #print(f"TEST {i} FAILED")
 
-    print(f"{num_passed} / {num_test} TESTS PASSED")
+    #print(f"{num_passed} / {num_test} TESTS PASSED")
     if num_passed == num_test:
         print("ALL TESTS PASSED!")
         print("PROGRAM VERIFIED")

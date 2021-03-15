@@ -2,7 +2,7 @@ from z3 import *
 from src.parser import input_to_list, parse, get_grammar, parse_sygus
 #from src.synthesizer import *
 #from src.synthesizer_dfs import *
-#from src.synthesizer_enumerative import top_down_synthesize
+from src.synthesizer_enumerative import top_down_synthesize
 #from src.synthesizer_v2 import cdcl_synthesize
 from src.synthesizer_v3 import cdcl_synthesize
 from src.semantics import *
@@ -63,27 +63,32 @@ for f in os.listdir(dir):
         #print(spec)
         var_decls = problem['var_decls']
         was_success = False
-        timeout = 120
+        timeout = 60
         timer, was_success = cdcl_synthesize(timeout, fun_dict, spec, var_decls)
+        #timer, was_success = top_down_synthesize(timeout, fun_dict, spec, var_decls)
         if was_success:
             print("yay!")
             #program.print_program()
-            solved.append(f)
-            tried.append((timer, f))
+            solved.append((timer, f))
         else:
             print("Did not succeed")
-            tried.append((timer, f))
 
+        tried.append((timer, f))
         num_success += was_success
 
 print('*' * 10)
 print("number of found programs:")
 print(num_success)
 print("Found programs:")
-print([f for f in solved])
+print([f for _, f in solved])
+n = len(tried)
+total = sum([t for t, _ in tried])
+mean = total / n
+print(f"Average solve time w/ timout: {round(mean, 2)} seconds")
+
 n = len(solved)
-sum = sum([t for t, _ in tried])
-mean = sum / n
-print(f"Average solve time: {round(mean, 2)}")
+total = sum([t for t, _ in solved])
+mean = total / n
+print(f"Average solve time w/o timout: {round(mean, 2)} seconds")
 
 
