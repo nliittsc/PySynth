@@ -1,7 +1,7 @@
 from z3 import *
 from typing import Union, Tuple, Set
 from copy import deepcopy
-import random
+from src.commons import productions_map
 
 
 
@@ -42,6 +42,7 @@ class Node:
         self.num_children = 0
         self.parent = -1
         self.d_level = 0
+        self.prod_id = 0
         # TODO: think about the relationship between self.i and self.offset (for children making)
 
     # indicates whether a given node is an "empty" node
@@ -192,6 +193,7 @@ class AST:
     def delete_node_(self, id: int):
         self.graph_[id].non_terminal = ''
         self.graph_[id].production = ''
+        self.graph_[id].prod_id = 0
         self.graph_[id].children = []
         self.graph_[id].num_children = 0
 
@@ -303,18 +305,28 @@ class AST:
             return True
     # Returns the partial program as a SAT formula that is compatible with python's Z3 API
     def encode(self):
-        r = self.root
-        encoded_vars = []
-        stack = [r]
-        while stack:
-            v = stack.pop(0)
-            if not v.is_hole() and not v.is_empty():  # Can only encode nodes where a production is applied
-                encoded_vars.append(v.encode_node())
-                for c in v.get_children():
-                    stack.append(c)
-        # Return the conjunction of the boolean variables
+        encoded_vars = [v.encode_node()
+                        for v in self.graph_.values()
+                        if not v.is_hole() and not v.is_empty()]
         return encoded_vars
 
+
+        # r = self.root
+        # encoded_vars = []
+        # stack = [r]
+        # while stack:
+        #     v = stack.pop(0)
+        #     if not v.is_hole() and not v.is_empty():  # Can only encode nodes where a production is applied
+        #         encoded_vars.append(v.encode_node())
+        #         for c in v.get_children():
+        #             stack.append(c)
+        # # Return the conjunction of the boolean variables
+        # return encoded_vars
+
+    def to_production_codes(self):
+        codes = [(v.id, productions_map[v.production])
+                 for v in self.graph_.values()]
+        return codes
 
 
     # converts the AST to an S-expression representing a program

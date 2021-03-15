@@ -1,11 +1,9 @@
 from z3 import *
 from src.parser import input_to_list, parse, get_grammar, parse_sygus
-#from src.synthesizer import *
-#from src.synthesizer_dfs import *
+import os
 from src.synthesizer_enumerative import top_down_synthesize
 #from src.synthesizer_v2 import cdcl_synthesize
 from src.synthesizer_v3 import cdcl_synthesize
-from src.semantics import *
 from src.semantics_v2 import *
 
 dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\benchmark_subset'
@@ -15,15 +13,10 @@ solved = []
 tried = []
 for f in os.listdir(dir):
     i += 1
-    #if i > 5:
-    #    break
     path = os.path.join(dir, f)
     print('-' * 5)
     print("Current file:")
     print(f)
-    #if str(f).__contains__('long'):
-    #    print("Skipping.")
-    #    continue
     with open(path) as file:
         input_str = file.read()
         lines = input_to_list(input_str)
@@ -63,9 +56,9 @@ for f in os.listdir(dir):
         #print(spec)
         var_decls = problem['var_decls']
         was_success = False
-        timeout = 60
-        timer, was_success = cdcl_synthesize(timeout, fun_dict, spec, var_decls)
-        #timer, was_success = top_down_synthesize(timeout, fun_dict, spec, var_decls)
+        timeout = 300
+        #timer, was_success = cdcl_synthesize(timeout, fun_dict, spec, var_decls)
+        timer, was_success = top_down_synthesize(timeout, fun_dict, spec, var_decls)
         if was_success:
             print("yay!")
             #program.print_program()
@@ -91,4 +84,5 @@ total = sum([t for t, _ in solved])
 mean = total / n
 print(f"Average solve time w/o timout: {round(mean, 2)} seconds")
 
+dir = r"C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\tests"
 

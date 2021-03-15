@@ -1,8 +1,7 @@
 from z3 import *
-from src.ast import Node, AST
-from src.semantics import mk_bool
-from src.semantics_v2 import semantics, encode
-
+from src.ast import AST
+#from src.semantics_v2 import semantics, encode
+from src.commons import sem, encode
 from copy import deepcopy
 
 
@@ -15,11 +14,11 @@ def naive_analyze_conflict(ast: AST, kappa, hp):
     # Block the most recent assignment
     #print("found core:")
     #print(kappa)
-    b = mk_bool(hp[0].id, hp[1][0])
+    b = encode(hp[0].id, hp[1][0])
     lemmas = [Not(b)]
     return lemmas
 
-def analyze_conflict(program : AST, processed_core, conflict_map):
+def analyze_conflict(program : AST, processed_core):
     lemma = BoolVal(False)
     d_levels = [0]
     s = Solver()
@@ -27,10 +26,6 @@ def analyze_conflict(program : AST, processed_core, conflict_map):
         node = program.search(node_id)
         ret_type = node.non_terminal
         sigma = []
-        if node_id not in conflict_map.keys():
-            conflict_map[node_id] = 1
-        else:
-            conflict_map[node_id] += 1
         # if not node.get_children():
         #    ops = [p for p in program.prods[ret_type] if not p[1]]
         # else:
@@ -48,7 +43,7 @@ def analyze_conflict(program : AST, processed_core, conflict_map):
             u.children = []
             u.apply_prod_(op)
             # now we check if this is equivalent modulo conflict
-            chi_semantics = semantics(u, program.inputs)
+            chi_semantics = sem(u, program.inputs)
             p = And(chi_semantics)
             modulo_conflict = Implies(p, q)
             s.add(Not(modulo_conflict))
@@ -61,8 +56,9 @@ def analyze_conflict(program : AST, processed_core, conflict_map):
         if sigma:
             d_levels.append(node.d_level)
             lemma = Or(lemma, And(sigma))
+    #print(f"LEARNED LEMMA {lemma}")
     # return the learned lemma, and the backtrack levels
-    return [lemma], d_levels, conflict_map
+    return [lemma], d_levels
 
 
 

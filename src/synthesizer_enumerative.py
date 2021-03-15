@@ -8,7 +8,7 @@ from copy import deepcopy, copy
 import time
 
 from src.propogate import propogate1, propogate2, simple_propogate, copy_propogate
-from src.semantics import sem, infer_spec
+from src.commons import sem, infer_spec
 import numpy as np
 import random
 
@@ -57,7 +57,7 @@ class Trail:
 
 
 # The SYNTHESIZE loop to be called from main.
-def top_down_synthesize(timeout, fun_dict, constraints, var_decls):
+def top_down_synthesize(timeout, fun_dict, constraints):
     # Initialize
     knowledge_base = []  # List of lemmas learned
     program = AST(fun_dict)
@@ -65,10 +65,10 @@ def top_down_synthesize(timeout, fun_dict, constraints, var_decls):
     # deleting some not implemented grammar
     program.prods['ntString'] = [p for p in program.prods['ntString']
                                  if p[0] != 'int.to.str'
-                                 and p[0] != 'str.replace'
                                  and p[0] != 'ite']
     program.prods['ntInt'] = [p for p in program.prods['ntInt']
-                              if p[0] != 'str.to.int']
+                              if p[0] != 'str.to.int'
+                              and p[0] != 'ite']
     program.prods['ntBool'] = [p for p in program.prods['ntBool']
                                if p[0] != 'str.prefixof'
                                  and p[0] != 'str.suffixof'
@@ -82,23 +82,20 @@ def top_down_synthesize(timeout, fun_dict, constraints, var_decls):
     i = 0
     while True:
         elapsed_time = time.time() - start_time
-        if elapsed_time > timeout:
-            print("TIMEOUT")
-            return timeout, False
+        sys.stdout.write("\r" + f"ELAPSED TIME {round(elapsed_time, 2)}/{timeout} seconds")
+        sys.stdout.flush()
 
         prog = queue.pop(0)
-        if i % 100 == 0:
-            print(f"ELAPSED TIME {elapsed_time}")
-            #print("CURRENT PROGRAM")
-            #prog.print()
+
+        if elapsed_time > timeout:
+            print("TIMEOUT")
+            return prog, timeout, False
+
         if prog.is_concrete():
-            #print("VERIFYING:")
-            #prog.print()
             verified = smt_interpreter(prog, constraints)
             if verified:
-                #print("PROGRAM VERIFIED")
                 elapsed_time = time.time() - start_time
-                return elapsed_time, True
+                return prog, elapsed_time, True
         else:
             hole_ids = rank_non_terminals(prog)
             h_id = hole_ids.pop(0)
