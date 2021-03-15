@@ -82,13 +82,13 @@ def top_down_synthesize(timeout, fun_dict, constraints):
     i = 0
     while True:
         elapsed_time = time.time() - start_time
-        sys.stdout.write("\r" + f"ELAPSED TIME {round(elapsed_time, 2)}/{timeout} seconds")
-        sys.stdout.flush()
+        #sys.stdout.write("\r" + f"ELAPSED TIME {round(elapsed_time, 2)}/{timeout} seconds")
+        #sys.stdout.flush()
 
         prog = queue.pop(0)
 
         if elapsed_time > timeout:
-            print("TIMEOUT")
+            #print("TIMEOUT")
             return prog, timeout, False
 
         if prog.is_concrete():
