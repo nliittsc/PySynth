@@ -8,6 +8,7 @@ from src.interpreter import smt_interpreter
 from copy import deepcopy, copy
 import time
 import json
+import random
 import numpy as np
 
 from src.propogate import propogate
@@ -33,29 +34,24 @@ def sym_map(term: str, lookup):
 
 # ranks a list of productions.
 # Currently biases productions with no children
-def rank_productions(productions, nt, lookup):
-    probs = [pcfg[nt][sym_map(p[0], lookup)] for p in productions]
-    denom = sum(probs)
-    probs = [p/denom for p in probs]
-    productions = sorted(zip(productions, probs), key=lambda t: t[1])
-    return [p for p, _ in productions]
+def pick_production(productions):
+    #probs = [pcfg[nt][sym_map(p[0], lookup)] for p in productions]
+    #denom = sum(probs)
+    #probs = [p/denom for p in probs]
+    #productions = sorted(zip(productions, probs), key=lambda t: t[1])
+    #rnd_idx = np.random.choice(productions, p=probs)
+    p = random.choice(productions)
+    return p
 
-# rank the set of non-terminals (holes) by
-# choosing the deepest hole
-def rank_non_terminals(program: AST):
-    hole_ids = [h.id for h in program.get_holes()]
-    return hole_ids
 
-def decide(program, knowledge_base, lookup):
-    hole_id = rank_non_terminals(program).pop(0)
-    hole = program.search(hole_id)
-    productions = program.prods[hole.non_terminal]
+
+def decide(program, knowledge_base, hole, productions):
     sat_problem = program.encode() + knowledge_base
     s = Solver()
     consistent_productions = [p for p in productions
                               if not unsat == s.check(sat_problem + [encode(hole, p)])]
-    ranked_productions = rank_productions(consistent_productions, hole.non_terminal, lookup)
-    return hole_id, ranked_productions
+    p = pick_production(consistent_productions)
+    return p
 
 
 # returns the second highest decision level
@@ -69,6 +65,20 @@ def get_decision_level(d_levels):
             return 0
         else:
             return max(d_levels)
+
+def compute_height_(node, curr_height):
+    heights = []
+    if node.is_hole() or node.num_children == 0:
+        return [curr_height]
+    else:
+        for v in node.get_children():
+            heights += compute_height_(v, curr_height+1)
+    return heights
+
+def compute_height(node):
+    curr_height = 1
+    heights = compute_height_(node, curr_height)
+    return max(heights)
 
 
 class Trail:
@@ -100,19 +110,19 @@ class Trail:
             v.make_notempty_(nt)
             assert (program.search(node_id).is_hole())
             sat_problem = And(program.encode() + knowledge_base)
-            conflict = s.check(sat_problem) == unsat
+            s.add(sat_problem)
+            conflict = s.check() == unsat
             s.pop()
-        program.d_level = d_level
-        return program
+        return program, d_level
 
 
-    def backtrack(self, d_level, program):
+    def backtrack(self, program, d_level):
         if d_level == 0:
             self.trail = []
-            self.push(0,1)
+            self.push(0, 1)
             program.make_hole_(1)
             program.d_level = 0
-            return program
+            return program, d_level
         else:
             while True:
                 d_level0, node_id = self.peek()
@@ -126,13 +136,91 @@ class Trail:
                     break
             if not self.trail:
                 self.push(0, 1)
-            program.d_level = d_level0
-            return program
+            return program, d_level0
+
+
+
+
+# A proper DFS search for program synthesis, bounded by height of the AST
+# Returns 'verified, satconflict, conflict, concrete, dlevel, trail, program'
+# Design similiar to DPLL for SAT solver
+def search(program, constraints, knowledge_base,
+           trail, curr_height, max_height, dlevel):
+    verified = False
+    conflict = False
+
+    # Check that program is consistent with knowledgebase
+    sat_conflict, concrete = propogate(program, knowledge_base, trail)
+
+    # conflict means program has become unsat. Need to return so backtracking can happen
+    if sat_conflict:
+        return verified, sat_conflict, conflict, concrete, dlevel, trail, program
+
+    # no conflict, and concrete == candidate program
+    if concrete:
+        verified = smt_interpreter(program, constraints)
+        if not verified:  # Failed. Block this program
+            knowledge_base.append(Not(And(program.encode())))
+        return verified, sat_conflict, conflict, concrete, dlevel, trail, program
+
+    else:  # program has a hole
+        holes = program.get_holes(return_copy=False)
+        h = holes.pop(0)
+        if curr_height == max_height:  # can only pick rules that spawn no children
+            valid_prods = [p for p in program.prods[h.non_terminal]
+                           if not p[1]]
+        elif curr_height < max_height:  # can pick whatever
+            valid_prods = program.prods[h.non_terminal]
+        else:
+            raise ValueError("current height is larger than max height")
+        # pick a production
+        p = decide(program, knowledge_base, h, valid_prods)
+        if p[1]:
+            curr_height += 1
+
+        # increment decision level, apply decision
+        program.fill(h.id, p)
+        dlevel += 1
+        trail.push(dlevel, h.id)
+
+        # propogate and analyze
+        sat_conflict, concrete = propogate(program, knowledge_base, trail)
+        # program is inconsistent with knowledge base
+        if sat_conflict:
+            return verified, sat_conflict, conflict, concrete, dlevel, trail, program
+        # program has become concrete
+        if concrete:
+            verified = smt_interpreter(program, constraints)
+            if not verified:  # Failed. Block this program
+                knowledge_base.append(Not(And(program.encode())))
+            return verified, sat_conflict, conflict, concrete, dlevel, trail, program
+
+        # Not inconsistent, and not concrete. Need to analyze and continue search
+        unsat_core = check_conflict(program, constraints)
+        if unsat_core:  # conflict detected
+            lemma, conflict_levels = analyze_conflict(program, unsat_core)
+            knowledge_base += lemma
+            dlevel = get_decision_level(conflict_levels)
+            conflict = True
+            return verified, sat_conflict, conflict, concrete, dlevel, trail, program
+
+        # No problems. Search deeper
+        return search(program, constraints, knowledge_base, trail,
+                      curr_height, max_height, dlevel)
+
+
+
+        #
+
+
+
+
+
 
 
 
 # The SYNTHESIZE loop to be called from main.
-def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
+def cdcl_synthesize(timeout, fun_dict, constraints):
     # Initialize
     knowledge_base = []  # List of lemmas learned
     program = AST(fun_dict)
@@ -182,46 +270,7 @@ def cdcl_synthesize(timeout, fun_dict, constraints, var_decls):
             print("TIMEOUT")
             return timeout, False
 
-        # get a program
-        prog, trail_ = queue.pop(0)
-        trail.trail = trail_
-        conflict, concrete = propogate(prog, knowledge_base, trail)
-        if conflict:
-            # print("SAT BACKTRACK")
-            num_conflicts += 1
-            prog = trail.sat_backtrack(prog, knowledge_base)
-            queue.append((prog, deepcopy(trail.trail)))
 
-        elif concrete:
-            verified = smt_interpreter(prog, constraints)
-            if verified:
-                elapsed_time = time.time() - start_time
-                return elapsed_time, True
-
-            else:  # want to block this program
-                enc = prog.encode()
-                knowledge_base += [Not(And(enc))]
-        else:
-            # no conflicts from propogate. Move on to decide phase
-            hole_id, productions = decide(prog, knowledge_base, lookup)
-            prog.d_level += 1
-            w1 = []
-            for p in productions:
-                prog0 = deepcopy(prog)
-                trail0 = deepcopy(trail)
-                prog0.fill(hole_id, p)
-                trail0.push(prog0.d_level, hole_id)
-                unsat_core = check_conflict(prog0, constraints)
-                if unsat_core:  # False = empty unsat core = no conflict
-                    lemma, conflicts = analyze_conflict(prog0, unsat_core)
-                    knowledge_base += lemma
-                    d_level = get_decision_level(conflicts)
-                    # print(f"d level and trail: {d_level} / {trail.trail}")
-                    prog0 = trail.backtrack(d_level, prog0)
-                w1.append((prog0, trail0.trail))
-            queue = queue + w1
-
-        num_rounds += 1
 
 
 

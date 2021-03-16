@@ -248,12 +248,15 @@ class AST:
         assert(v.is_hole() is True)  # This should never fail
         if self.max_height < v.d + 1:
             self.nodes_at_depth[v.d + 1] = set()
-            self.max_height += 1
 
         self.graph_[id].apply_prod_(p)  # apply the production
+        flag = False
         for w in self.graph_[id].get_children():  # constant time w.r.t. max-arity
             self.graph_[w.id] = w
             self.nodes_at_depth[v.d + 1].add(w)
+            flag = True
+        if flag:
+            self.max_height += 1
 
 
         self.graph_[id].d_level = self.d_level

@@ -27,7 +27,7 @@ def propogate(program, knowledge_base, trail):
         s.push()
         possible_fills = Or([encode(hi, pj) for pj in prods[hi.non_terminal]])
         hypothesis = And(sat_problem, possible_fills)
-        unit_fill = encode(hi, pi) == BoolVal(True)
+        unit_fill = encode(hi, pi)
         f = Implies(hypothesis, unit_fill)
         s.add(Not(f))
         should_propogate = s.check() == unsat

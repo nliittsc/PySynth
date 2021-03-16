@@ -1,5 +1,5 @@
 from src.parser import input_to_list,parse_sygus
-from src.synthesizer_enumerative import top_down_synthesize
+from src.synthesizer_dfs import dfs_synthesize
 from src.semantics_v2 import *
 from joblib import Parallel, delayed
 import multiprocessing
@@ -25,8 +25,8 @@ def worker(f):
         fun_dict = problem['fun_dict'][fun_name]
         for c in problem['constraints']:
             spec.append(abstract_constraint(c, fun_name, fun_dict))
-        timeout = 300
-        program, timer, was_success = top_down_synthesize(timeout, fun_dict, spec)
+        timeout = 60
+        program, timer, was_success = dfs_synthesize(timeout, fun_dict, spec)
         if was_success:
             print("yay!")
             program.print()
@@ -71,4 +71,3 @@ file = 'enum_benchmark_results'
 path = os.path.join(dir, file)
 with open(path, 'w') as f:
     f.writelines(output)
-

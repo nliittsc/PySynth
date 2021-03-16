@@ -1,29 +1,8 @@
 from z3 import *
 from src.ast import AST, Node
-from src.analyze_conflict import naive_analyze_conflict, analyze_conflict
-from src.check_conflict import check_conflict
-from src.decide import decide, is_consistent
 from src.interpreter import interpreter, smt_interpreter
 from copy import deepcopy, copy
 import time
-
-from src.propogate import propogate1, propogate2, simple_propogate, copy_propogate
-from src.commons import sem, infer_spec
-import numpy as np
-import random
-
-
-# returns the second highest decision level
-def get_decision_level(d_levels):
-    if len(d_levels) == 1:
-        return 0  # go back to start
-    else:
-        m = max(d_levels)
-        d_levels = [d for d in d_levels if d != m]
-        if not d_levels:
-            return 0
-        else:
-            return max(d_levels)
 
 
 # ranks the non-terminals by the number o
@@ -108,23 +87,5 @@ def top_down_synthesize(timeout, fun_dict, constraints):
                 w1.append(prog1)
             queue = queue + w1
             i += 1
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

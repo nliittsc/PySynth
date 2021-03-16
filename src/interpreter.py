@@ -66,6 +66,11 @@ def to_smt(sexpr):
             offset = to_smt(sexpr[1][1])
             length = to_smt(sexpr[1][2])
             return SubString(s, offset, length)
+        if f == 'str.replace':
+            s = to_smt(sexpr[1][0])
+            t1 = to_smt(sexpr[1][1])
+            t2 = to_smt(sexpr[1][2])
+            return Replace(s, t1, t2)
         if f == 'str.indexof':
             s = to_smt(sexpr[1][0])
             substr = to_smt(sexpr[1][1])
