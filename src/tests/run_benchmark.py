@@ -1,6 +1,6 @@
 from src.parser import input_to_list,parse_sygus
 from src.synthesizer_v3 import cdcl_synthesize
-from src.semantics_v2 import *
+from src.commons import *
 from joblib import Parallel, delayed
 
 dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\benchmark_subset'
@@ -9,11 +9,12 @@ output = []
 def worker(f):
     path = os.path.join(dir, f)
     with open(path) as file:
+        print("Solving file " + f)
         input_str = file.read()
         lines = input_to_list(input_str)
         problem = parse_sygus(lines)
-        print('Function names:')
-        print(problem['fun_names'])
+        #print('Function names:')
+        #print(problem['fun_names'])
         fun_name = problem['fun_names'][0]
         prods = problem['fun_dict'][fun_name]['grammar'][2]
         # for nt in prods.keys():
@@ -34,7 +35,7 @@ def worker(f):
         return tuple([f, timer, was_success, program.to_program()])
 
 
-results = Parallel(n_jobs=1, verbose=6)(
+results = Parallel(n_jobs=-1, verbose=6)(
         delayed(worker)(f)
         for f in os.listdir(dir)
     )

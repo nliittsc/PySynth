@@ -43,6 +43,7 @@ def check_conflict(program : AST, constraints):
     for abstr_map in constraints:
         s.push()  # new state
         io_spec = abstr_map['sym_inputs'] + abstr_map['sym_outputs']
+        #print(io_spec)
         s.add(io_spec)
         result = s.check()
         s.pop()
@@ -51,9 +52,14 @@ def check_conflict(program : AST, constraints):
             enc = program_smt['program_spec'] + io_spec
             s.check(enc)
             unsat_core = s.unsat_core()
+            #print("unsat core")
             #print(unsat_core)
             processed_core = process_core(unsat_core, program_smt, io_spec)
             return processed_core
+        else:
+            #print("model:")
+            #print(s.model())
+            continue
 
     return []
 

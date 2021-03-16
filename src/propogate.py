@@ -7,7 +7,7 @@ import numpy as np
 import random
 
 
-def propogate(program, knowledge_base, trail):
+def propogate(program, knowledge_base):
     # check consistency with knowledge base
     s = Solver()
     s.push()
@@ -34,8 +34,7 @@ def propogate(program, knowledge_base, trail):
         s.pop()
         if should_propogate:
             program.fill(hi.id, pi)
-            trail.push(program.d_level, hi.id)
-            conflict, concrete = propogate(program, knowledge_base, trail)
+            conflict, concrete = propogate(program, knowledge_base)
 
         if conflict or concrete:
             break

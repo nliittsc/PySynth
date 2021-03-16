@@ -4,6 +4,32 @@ from src.ints import *
 from src.bools import *
 from copy import deepcopy
 
+t = Int('t')
+x1 = Int('x1')
+x2 = Int('x2')
+x3 = Int('x3')
+
+def head(i=None):
+    if i is None:
+        x = 't.head'
+    else:
+        x = 'x' + str(i) + '.head'
+    return Int(x)
+
+def last(i=None):
+    if i is None:
+        x = 't.last'
+    else:
+        x = 'x' + str(i) + '.last'
+    return Int(x)
+
+def length(i=None):
+    if i is None:
+        x = 't.len'
+    else:
+        x = 'x' + str(i) + '.len'
+    return Int(x)
+
 
 productions_map = {
     'str.++': 1,
@@ -13,7 +39,9 @@ productions_map = {
     'str.len': 5,
     'str.indexof': 6,
     'plus': 7,
-    'minus': 8
+    '+': 7,
+    'minus': 8,
+    '-': 8
 }
 
 semantics_map = {
@@ -46,23 +74,35 @@ def sem(node, inputs):
         if term[0] == '"' and term[-1] == '"':
             if len(term[1:-1]) == 0:
                 return [
-                    length(t) == 0,
-                    head(t) == 128,  # unique integer representing an empty string
-                    last(t) == 128,
+                    length() == 0,
+                    head() == 128,  # unique integer representing an empty string
+                    last() == 128,
                 ]
             #str_enc = [IntVal(ord(c)) for c in term[1:-1]]
             ascii_enc = [ord(c) for c in term[1:-1]]
             return [
-                length(t) == len(ascii_enc),
-                head(t) == ascii_enc[0],
-                last(t) == ascii_enc[-1],
+                length() == len(ascii_enc),
+                head() == ascii_enc[0],
+                last() == ascii_enc[-1],
             ]
         else:  # must be some input
-            int_term = Int(term)
+            #int_term = Int(term)
+            #print("term:")
+            #print(term)
+            for (i, input) in enumerate(inputs):
+                if term == input:
+                    x_len = length(i+1)
+                    x_head = head(i+1)
+                    x_last = last(i+1)
+                    break
             return [
-                length(t) == length(int_term),
-                head(t) == head(int_term),
-                last(t) == last(int_term)
+                length() == x_len,
+                x_len == Int(term + '.len'),
+                head() == x_head,
+                x_head == Int(term + '.head'),
+                last() == x_last,
+                x_last == Int(term + '.last')
+
             ]
             # this is essentially constant time.
             # for (i, inp) in enumerate(inputs):
@@ -71,12 +111,14 @@ def sem(node, inputs):
             #         int_term = Int(term)
             #         break
             # return [
-            #     #length(t) == length(x_i),
-            #     #head(t) == head(x_i),
-            #     #last(t) == last(x_i),
+            #     length(t) == length(x_i),
+            #     head(t) == head(x_i),
+            #     last(t) == last(x_i),
             #     length(t) == length(int_term),
             #     head(t) == head(int_term),
-            #     last(t) == last(int_term)
+            #     last(t) == last(int_term),
+            #     t == x_i,
+            #     x_i == int_term
             # ]
 
     if isinstance(term, str) and term in productions_map.keys():
@@ -105,20 +147,27 @@ def abstract(inputs: [str], output: str, input_map):
         string_lit = s[1:-1]  # string literal connected to input symbol
 
         if len(string_lit) > 0:
+            x = Int(x_i)
             abstraction_map['raw_inputs'].append((in_term, string_lit))
             abstraction_map['sym_inputs'] += [
-                length(in_term) == len(string_lit),
-                head(in_term) == ord(string_lit[0]),
-                last(in_term) == ord(string_lit[-1]),
+                Int(in_term + '.len') == length(i+1),
+                Int(in_term + '.head') == head(i+1),
+                Int(in_term + '.last') == last(i+1),
+                length(i+1) == IntVal(len(string_lit)),
+                head(i+1) == IntVal(ord(string_lit[0])),
+                last(i+1) == IntVal(ord(string_lit[-1])),
                 #in_str_max == max([ord(c) for c in string_lit]),
                 #in_str_min == min([ord(c) for c in string_lit]),
             ]
         else: # this is for empty strings
             abstraction_map['raw_inputs'].append((in_term, string_lit))
             abstraction_map['sym_inputs'] += [
-                length(in_term) == 0,
-                head(in_term) == 128,
-                last(in_term) == 128,
+                Int(in_term + '.len') == length(i+1),
+                Int(in_term + '.head') == head(i+1),
+                Int(in_term + '.last') == last(i+1),
+                length(i+1) == 0,
+                head(i+1) == 128,
+                last(i+1) == 128
             ]
 
     # abstract the outputs, I.e., turn them into SMT formulas
@@ -126,15 +175,15 @@ def abstract(inputs: [str], output: str, input_map):
     string_lit = output[1:-1]
     if len(string_lit) > 0:
         abstraction_map['sym_outputs'] += [
-            length(t) == len(string_lit),
-            head(t) == ord(string_lit[0]),
-            last(t) == ord(string_lit[-1]),
+            length() == IntVal(len(string_lit)),
+            head() == IntVal(ord(string_lit[0])),
+            last() == IntVal(ord(string_lit[-1])),
         ]
     else:
         abstraction_map['sym_outputs'] += [
-            length(t) == len(string_lit),
-            head(t) == 128,
-            last(t) == 128,
+            length() == len(string_lit),
+            head() == 128,
+            last() == 128,
         ]
 
     abstraction_map['raw_outputs'].append(('t', string_lit))
@@ -165,22 +214,36 @@ def annotate_ast(node, inputs):
             for c in v.get_children():
                 queue.append(c)
 
+def build_subst_pairs(node):
+    return_id = 't' + str(node.id)
+    return_num = Int(return_id)
+    return_len = Int(return_id + '.len')
+    return_head = Int(return_id + '.head')
+    return_last = Int(return_id + '.last')
+    pair_list = [(t, return_num), (length(), return_len),
+                 (head(), return_head), (last(), return_last)]
+    for i, c in enumerate(node.get_children()):
+        in_id = 't'+str(c.id)
+        x_id = 'x' + str(i+1)
+        x_int = Int(x_id)
+        in_num = Int(in_id)
+        x_len = length(i+1)
+        x_head = head(i+1)
+        x_last = last(i+1)
+        in_len = Int(in_id + '.len')
+        in_head = Int(in_id + '.head')
+        in_last = Int(in_id + '.last')
+        pair_list += [(x_int, in_num), (x_len, in_len), (x_head, in_head),
+                      (x_last, in_last)]
+    return pair_list
+
+
 # perform variable substitutions to connect component specs
 def subst(node):
-    v_id = 't' + str(node.id)
-    v_int = Int(v_id)
     subst_spec = deepcopy(node.smt)
     # Do substitutions for the node return values
-    subst_spec = [substitute(f, (t, v_int)) for f in subst_spec]
-
-    # Do substitutions for the node's children. Aka, it's 'inputs'.
-    if node.num_children > 0:
-        num_input = 0
-        for c in node.get_children():
-            c_int = Int('t' + str(c.id))
-            num_input += 1
-            x_int = Int('x' + str(num_input))
-            subst_spec = [substitute(f, (x_int, c_int)) for f in subst_spec]
+    subst_pairs = build_subst_pairs(node)
+    subst_spec = [substitute(f, subst_pairs) for f in subst_spec]
 
     return subst_spec
 
@@ -197,8 +260,9 @@ def infer_spec(node, inputs: [str]):
         term = v.production if not v.is_hole() else None
         if v.id == 1:
             # need to connect the outputs.
-            t1 = Int('t1')
-            subbed_component = [substitute(f, (t1, t)) for f in subbed_component]
+            subst_pairs = [(Int('t1'), t), (Int('t1.len'), length()),
+                         (Int('t1.head'), head()), (Int('t1.last'), last())]
+            subbed_component = [substitute(f, subst_pairs) for f in subbed_component]
         spec['program_spec'] += subbed_component
         spec['node_info'][v.id] = {
             "subbed_component": subbed_component,

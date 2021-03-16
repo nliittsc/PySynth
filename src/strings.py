@@ -1,22 +1,31 @@
 from z3 import *
 
+
 t = Int('t')
 x1 = Int('x1')
 x2 = Int('x2')
 x3 = Int('x3')
 
-sort1 = [IntSort(), IntSort()]
-sort2 = [IntSort(), IntSort(), IntSort()]
-sort3 = [IntSort(), IntSort(), IntSort(), IntSort()]
+def head(i=None):
+    if i is None:
+        x = 't.head'
+    else:
+        x = 'x' + str(i) + '.head'
+    return Int(x)
 
-access = Function('access', sort2)
-head = Function('head', sort1)
-last = Function('last', sort1)
-length = Function('len', IntSort(), IntSort())
-concat = Function('concat', sort2)
-substr = Function('substr', sort3)
-replace = Function('replace', sort3)
-int_to_str = Function('int_to_str', sort1)
+def last(i=None):
+    if i is None:
+        x = 't.last'
+    else:
+        x = 'x' + str(i) + '.last'
+    return Int(x)
+
+def length(i=None):
+    if i is None:
+        x = 't.len'
+    else:
+        x = 'x' + str(i) + '.len'
+    return Int(x)
 
 
 #String concatenation
@@ -27,13 +36,13 @@ str_concat = {
     'type': 'string',
     'args': ['ntString', 'ntString'],
     'constraint': [
-        length(t) == length(x1) + length(x2),
-        IntVal(0) < length(x1),
-        IntVal(0) < length(x2),
-        length(x1) < length(t),
-        length(x2) < length(t),
-        head(t) == head(x1),
-        last(t) == last(x2)
+        length() == length(1) + length(2),
+        IntVal(0) < length(1),
+        IntVal(0) < length(2),
+        length(1) < length(),
+        length(2) < length(),
+        head() == head(1),
+        last() == last(2)
     ]
 }
 
@@ -48,13 +57,12 @@ str_at = {
     'type': 'string',
     'args': ['ntString', 'ntInt'],
     'constraint': [
-        length(t) == IntVal(1),
-        length(t) < length(x1),
-        IntVal(0) < length(x1),
+        length() == IntVal(1),
+        length() < length(1),
+        IntVal(0) < length(1),
         IntVal(0) <= x2,
-        x2 < length(x1),
-        head(t) == last(t),
-        #head(t) == access(x2, x1)
+        x2 < length(1),
+        head() == last(),
     ]
 }
 
@@ -71,13 +79,13 @@ str_substr = {
     'type': 'string',
     'args': ['ntString', 'ntInt', 'ntInt'],
     'constraint': [
-        IntVal(0) < length(t),
-        IntVal(0) < length(x1),
+        IntVal(0) < length(),
+        IntVal(0) < length(1),
         IntVal(0) <= x2,
         IntVal(0) < x3,
-        x3 <= length(x1),
-        x2 < length(x1),
-        length(t) == x3,
+        x3 <= length(1),
+        x2 < length(1),
+        length() == x3,
     ]
 }
 
@@ -94,11 +102,11 @@ str_replace = {
     'type': 'string',
     'args': ['ntString', 'ntString', 'ntString'],
     'constraint': [
-        0 < length(t),
-        0 < length(x1),
-        0 < length(x2),
-        0 < length(x3),
-        Implies(length(x3) > length(x2), length(t) > length(x1)),
-        Implies(length(x3) <= length(x2), length(t) <= length(x1))
+        0 < length(),
+        0 < length(1),
+        0 < length(2),
+        0 < length(3),
+        Implies(length(3) > length(2), length() > length(1)),
+        Implies(length(3) <= length(2), length() <= length(1))
     ]
 }

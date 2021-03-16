@@ -66,7 +66,7 @@ def dfs_search(candidate_program, knowledge_base, constraints, max_height, start
         else:
             return prog0
 
-
+    return None
 
 
 # The SYNTHESIZE loop to be called from main.
