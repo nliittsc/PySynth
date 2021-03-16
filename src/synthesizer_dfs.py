@@ -4,35 +4,8 @@ from src.interpreter import smt_interpreter
 from src.commons import encode
 from copy import deepcopy, copy
 import time
+from functools import lru_cache
 
-
-# ranks the non-terminals by the number o
-def rank_productions(program: AST, non_terminal: str):
-    productions = program.prods[non_terminal]
-    return sorted(productions, key=lambda p: len(p[1]))
-
-# rank the set of non-terminals (holes) by
-# choosing the deepest hole
-def rank_non_terminals(program: AST):
-    hole_ids = [h.id for h in program.get_holes()]
-    return sorted(hole_ids)
-
-class Trail:
-    def __init__(self):
-        self.trail = []
-        self.worklist = []
-
-    def push(self, node_id, production, decision_level):
-        self.trail.append((node_id, production, decision_level))
-
-    def peek(self):
-        return self.trail[-1]
-
-    def is_empty(self):
-        if self.trail:
-            return False
-        else:
-            return True
 
 def block(program):
     return Not(And(program.encode()))
@@ -43,7 +16,6 @@ def decide(candidate_program, knowledge_base, max_height):
         return None, []
     h = holes.pop(0)
     prods = candidate_program.prods[h.non_terminal]
-    print(f"node:{h.id}, depth:{h.d}")
     if h.d == max_height:
         prods = [p for p in prods if not p[1]]
     sat_problem = candidate_program.encode() + knowledge_base
@@ -72,8 +44,11 @@ def accept_or_reject(candidate_program, knowledge_base, constraints, max_height)
         reject = True
     return accept, reject
 
-def dfs_search(candidate_program, knowledge_base, constraints, max_height):
-    candidate_program.print()
+#@lru_cache(maxsize=100)
+def dfs_search(candidate_program, knowledge_base, constraints, max_height, start_time, timeout):
+    elapsed_time = time.time() - start_time
+    if elapsed_time > timeout:
+        return None
     accept, reject = accept_or_reject(candidate_program, knowledge_base, constraints, max_height)
     if reject:
         return None
@@ -85,7 +60,7 @@ def dfs_search(candidate_program, knowledge_base, constraints, max_height):
     for p in productions:
         prog0 = deepcopy(candidate_program)
         prog0.fill(hole.id, p)
-        prog0 = dfs_search(prog0, knowledge_base, constraints, max_height)
+        prog0 = dfs_search(prog0, knowledge_base, constraints, max_height, start_time, timeout)
         if prog0 is None:
             continue
         else:
@@ -126,22 +101,25 @@ def dfs_synthesize(timeout, fun_dict, constraints):
         #sys.stdout.flush()
 
         if elapsed_time > timeout:
-            #print("TIMEOUT")
-            return program, timeout, False
+            print("TIMEOUT")
+            return fresh_program, timeout, False
 
         program = deepcopy(fresh_program)
-        program = dfs_search(program, knowledge_base, constraints,
-                                             max_height)
+        program = dfs_search(program,
+                             knowledge_base,
+                             constraints,
+                             max_height,
+                             start_time,
+                             timeout)
         if program is not None:
             print(f"FOUND PROGRAM: {program.print()}")
-            verified = smt_interpreter()
+            elapsed_time = time.time() - start_time
+            verified = smt_interpreter(program, constraints)
             if verified:
-                return program, timeout, True
+                return program, elapsed_time, True
         else:
-            print("INCREASING HEIGHT")
             max_height += 1
             continue
-
 
 
 
