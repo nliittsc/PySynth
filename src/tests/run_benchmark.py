@@ -28,8 +28,9 @@ def worker(f):
         timeout = 60
         program, timer, was_success = cdcl_synthesize(timeout, fun_dict, spec)
         if was_success:
-            print("yay!")
+            print("Program found for file " + f)
             program.print()
+            print("Yay!")
         else:
             print("Did not succeed")
         return tuple([f, timer, was_success, program.to_program()])
