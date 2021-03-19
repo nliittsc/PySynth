@@ -3,7 +3,7 @@ from src.synthesizer_v3 import cdcl_synthesize
 from src.commons import *
 from joblib import Parallel, delayed
 
-dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\benchmark_subset'
+dir = r'C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\benchmarks\PBE_Strings_2018_comp'
 output = []
 
 def worker(f):
@@ -70,6 +70,6 @@ for f, prog in successful_runs:
 dir = r"C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\tests"
 file = 'cdcl_benchmark_results'
 path = os.path.join(dir, file)
-with open(path, 'w') as f:
+with open(path, 'w+') as f:
     f.writelines(output)
 

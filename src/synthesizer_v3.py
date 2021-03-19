@@ -168,10 +168,7 @@ def accept_solution(candidate_program, knowledge_base, constraints):
 def dfs_search(candidate_program, knowledge_base, constraints, max_height,
                dlevel, start_time, timeout):
 
-    #print("Entering DFS with ")
-    #candidate_program.print()
-    #print("knowledge base")
-    #print(knowledge_base)
+
     elapsed_time = time.time() - start_time
     # break
     if elapsed_time > timeout or candidate_program.max_height > max_height:
@@ -206,10 +203,15 @@ def dfs_search(candidate_program, knowledge_base, constraints, max_height,
         unsat_core = check_conflict(prog0, constraints)
         if unsat_core:
             #print("Conflict detected")
+            #print("Rejecting Partial Program:")
+            #prog0.print()
+            #print(unsat_core[0])
             lemma, conflict_levels = analyze_conflict(prog0, unsat_core)
-            #print(f"Learned lemma: {lemma}")
+            #print(f"Learned lemma: ")
+            #pp(lemma)
             knowledge_base += lemma
-            return None  # backtrack
+            continue
+            #return None  # backtrack
         else:  # search continues
             prog0 = dfs_search(prog0, knowledge_base, constraints, max_height,
                                dlevel, start_time, timeout)
@@ -220,12 +222,6 @@ def dfs_search(candidate_program, knowledge_base, constraints, max_height,
                 return prog0
 
     return None
-
-
-
-
-
-
 
 
 

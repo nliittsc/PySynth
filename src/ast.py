@@ -144,6 +144,8 @@ class AST:
         # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
         self.num_nonempty_at_depth = dict()
         self.nodes_at_depth = dict()
+        for i in range(30):
+            self.nodes_at_depth[i] = set()
 
         # Tracks the maximum allowed height of the AST.
         self.max_height = 0

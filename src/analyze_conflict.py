@@ -19,7 +19,7 @@ def naive_analyze_conflict(ast: AST, kappa, hp):
     return lemmas
 
 def analyze_conflict(program : AST, processed_core):
-    lemma = BoolVal(False)
+    lemma = [BoolVal(False)]
     d_levels = [0]
     s = Solver()
     for (phi, node_id, chi_n) in processed_core:
@@ -55,10 +55,9 @@ def analyze_conflict(program : AST, processed_core):
         # if the lemma will include the node, add decision level
         if sigma:
             d_levels.append(node.d_level)
-            lemma = Or(lemma, And(sigma))
-    #print(f"LEARNED LEMMA {lemma}")
+            lemma.append(And(sigma))
     # return the learned lemma, and the backtrack levels
-    return [lemma], d_levels
+    return [Or(lemma)], d_levels
 
 
 

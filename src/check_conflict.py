@@ -52,7 +52,7 @@ def check_conflict(program : AST, constraints):
             enc = program_smt['program_spec'] + io_spec
             s.check(enc)
             unsat_core = s.unsat_core()
-            #print("unsat core")
+            #print("Unsat Core")
             #print(unsat_core)
             processed_core = process_core(unsat_core, program_smt, io_spec)
             return processed_core
