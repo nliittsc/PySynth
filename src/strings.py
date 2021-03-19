@@ -39,6 +39,8 @@ str_concat = {
         Int('t.len') == Int('x1.len') + Int('x2.len'),
         0 < Int('x1.len'),
         0 < Int('x2.len'),
+        Int('t.head') == Int('x1.head'),
+        Int('t.last') == Int('x2.last')
     ]
 }
 

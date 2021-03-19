@@ -1,10 +1,11 @@
-Found Programs: 21/108 = 0.19%
-Avg. Total Runtime (include timeout): 50.49 seconds
-Avg. Success Runtime (no timeout): 11.11
-Benchmark: firstname-long-repeat.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 1]]]]
-Benchmark: firstname-long.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 1]]]]
-Benchmark: firstname.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 1]]]]
-Benchmark: firstname_small.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 1]]]]
+Found Programs: 24/108 = 0.22%
+Avg. Total Runtime (include timeout): 48.39 seconds
+Avg. Success Runtime (no timeout): 7.74
+Benchmark: firstname-long-repeat.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 0]]]]
+Benchmark: firstname-long.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 0]]]]
+Benchmark: firstname.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 0]]]]
+Benchmark: firstname_small.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 0]]]]
+Benchmark: name-combine-long-repeat.sl, Program: ['str.++', [['str.++', ['firstname', '" "']], 'lastname']]
 Benchmark: name-combine-long.sl, Program: ['str.++', [['str.++', ['firstname', '" "']], 'lastname']]
 Benchmark: name-combine.sl, Program: ['str.++', [['str.++', ['firstname', '" "']], 'lastname']]
 Benchmark: name-combine_short.sl, Program: ['str.++', [['str.++', ['firstname', '" "']], 'lastname']]
@@ -12,13 +13,15 @@ Benchmark: phone-1-long-repeat.sl, Program: ['str.substr', ['name', 4, 3]]
 Benchmark: phone-1-long.sl, Program: ['str.substr', ['name', 4, 3]]
 Benchmark: phone-1.sl, Program: ['str.substr', ['name', 4, 3]]
 Benchmark: phone-1_short.sl, Program: ['str.substr', ['name', 4, 3]]
-Benchmark: phone-2-long.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 5]]
-Benchmark: phone-2.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 5]]
-Benchmark: phone-2_short.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 5]]
+Benchmark: phone-2-long-repeat.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]
+Benchmark: phone-2-long.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]
+Benchmark: phone-2.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]
+Benchmark: phone-2_short.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]
 Benchmark: phone-long-repeat.sl, Program: ['str.substr', ['name', 0, 3]]
 Benchmark: phone-long.sl, Program: ['str.substr', ['name', 0, 3]]
 Benchmark: phone.sl, Program: ['str.substr', ['name', 0, 3]]
 Benchmark: phone_short.sl, Program: ['str.substr', ['name', 0, 3]]
+Benchmark: reverse-name-long-repeat.sl, Program: ['str.++', [['str.++', ['lastname', '" "']], 'firstname']]
 Benchmark: reverse-name-long.sl, Program: ['str.++', [['str.++', ['lastname', '" "']], 'firstname']]
 Benchmark: reverse-name.sl, Program: ['str.++', [['str.++', ['lastname', '" "']], 'firstname']]
 Benchmark: reverse-name_short.sl, Program: ['str.++', [['str.++', ['lastname', '" "']], 'firstname']]

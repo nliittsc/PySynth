@@ -257,7 +257,7 @@ def backtracking(program, knowledge_base, constraints, rule_map,
             return None
 
         prog = stack.pop()
-        prog.print()
+        #prog.print()
 
         if prog.is_concrete():
             accept = smt_interpreter(prog, constraints)
@@ -353,7 +353,7 @@ def cdcl_synthesize(timeout, fun_dict, constraints):
                 return program, elapsed_time, True
         else:
             max_height += 1
-            print(f"increase height to {max_height}")
+            #print(f"increase height to {max_height}")
             continue
 
 
