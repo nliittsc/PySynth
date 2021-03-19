@@ -78,7 +78,7 @@ str_substr = {
         0 <= x2,
         x2 <= Int('x1.len'),
         0 <= x3,
-        x3 == Int('x1.len') - x2
+        x3 <= Int('x1.len')
     ]
 }
 

@@ -246,15 +246,19 @@ def backtracking(program, knowledge_base, constraints, rule_map,
                  pcfg, max_height, start_time, timeout):
     stack = [program]
     s = Solver()
-    num_pruned = 0
+    #print("Initial knowledge")
+    #print(knowledge_base)
     while stack:
+        #print("Current knowledge")
+        #print(knowledge_base)
+
         elapsed_time = time.time() - start_time
         if elapsed_time > timeout:
             return None
 
         prog = stack.pop()
-        print("popped")
         prog.print()
+
         if prog.is_concrete():
             accept = smt_interpreter(prog, constraints)
             if accept:
@@ -262,7 +266,6 @@ def backtracking(program, knowledge_base, constraints, rule_map,
                 return prog
             else:
                 knowledge_base.append(block(prog))
-                knowledge_base = [simplify(And(knowledge_base))]
                 continue
 
         # check which production rules are consistent
@@ -274,43 +277,37 @@ def backtracking(program, knowledge_base, constraints, rule_map,
         #print("filling for ")
         #prog.print()
         prods = rule_map[h.non_terminal]
-        #np.random.shuffle(prods)
-        s_ = Solver()
-        enc = prog.encode() + knowledge_base
-        s_.add(enc)
-        new_stack = []
         for p in prods:
-            #print(f"new rule: {p}")
-            conflict = s_.check(encode(h, p)) == unsat
-            if conflict:
-                continue
+
+            # #print(f"new rule: {p}")
             prog0 = fill(prog, h, p, pcfg)
             h = prog0.search(h.id, return_copy=False)
             propogate(prog0, h, p)
 
+            enc = prog0.encode() + knowledge_base
+            result = s.check(enc)
+            if result == unsat:
+                #print("CONFLICT")
+                #print("program: {}".format(prog0.to_program()))
+                #print("encoding: {}".format(enc))
+                #print("unsat core: {}".format(s.unsat_core()))
+                continue
+
+
             if prog0.max_height <= max_height:
                 unsat_core = check_conflict(prog0, constraints)
                 if unsat_core:
-                    lemma, _ = analyze_conflict(prog0, unsat_core, rule_map)
-                    #print("Learned lemma")
-                    #pp(lemma)
-                    knowledge_base += lemma
-                    knowledge_base = [simplify(And(knowledge_base))]
+                    lemma = analyze_conflict(prog0, unsat_core, rule_map)
+                    if lemma is not None:
+                        knowledge_base.append(lemma)
+                    #if lemma not in knowledge_base:
+                    #    knowledge_base.append(lemma)
                     continue
 
-                new_stack.append(prog0)
+                stack.append(prog0)
 
-        stack += new_stack
     #print(f"PRUNED {num_pruned}")
     return None
-
-
-
-
-
-
-
-
 
 
 # The SYNTHESIZE loop to be called from main.
@@ -342,7 +339,6 @@ def cdcl_synthesize(timeout, fun_dict, constraints):
             print("TIMEOUT")
             return fresh_program, timeout, was_success
 
-        knowledge_base = [simplify(And(knowledge_base))]
         program = deepcopy(fresh_program)
         #program.print()
         #program = basic_enumerate(program, knowledge_base, constraints, rule_map, start_time, timeout)
@@ -357,7 +353,7 @@ def cdcl_synthesize(timeout, fun_dict, constraints):
                 return program, elapsed_time, True
         else:
             max_height += 1
-            #print(f"increase height to {max_height}")
+            print(f"increase height to {max_height}")
             continue
 
 

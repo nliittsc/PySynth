@@ -12,11 +12,12 @@ def process_core(unsat_core, program_smt, io_spec):
     # during the processing.
     unsat_core = [simplify(clause) for clause in unsat_core]
     io_spec = [simplify(clause) for clause in io_spec]
+    #print("PROGRAM SMT")
+    #print(program_smt['program_spec'] + io_spec)
     #print("UNSAT CORE")
     #print(unsat_core)
-    #print("PROGRAM SMT")
-    #print(program_smt)
     kappa = [clause for clause in unsat_core if clause not in io_spec]
+    #print(kappa)
     processed_core = [(node['component'][i], node_id, node['terminal'])
                       for node_id, node in program_smt['node_info'].items()
                       for i, phi in enumerate(node['subbed_component'])
