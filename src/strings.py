@@ -36,13 +36,9 @@ str_concat = {
     'type': 'string',
     'args': ['ntString', 'ntString'],
     'constraint': [
-        length() == length(1) + length(2),
-        IntVal(0) < length(1),
-        IntVal(0) < length(2),
-        length(1) < length(),
-        length(2) < length(),
-        head() == head(1),
-        last() == last(2)
+        Int('t.len') == Int('x1.len') + Int('x2.len'),
+        0 < Int('x1.len'),
+        0 < Int('x2.len'),
     ]
 }
 
@@ -57,12 +53,10 @@ str_at = {
     'type': 'string',
     'args': ['ntString', 'ntInt'],
     'constraint': [
-        length() == IntVal(1),
-        length() < length(1),
-        IntVal(0) < length(1),
-        IntVal(0) <= x2,
-        x2 < length(1),
-        head() == last(),
+        Int('t.len') == 1,
+        1 < Int('x1.len'),
+        Int('x2') <= Int('x1.len'),
+        0 <= Int('x2')
     ]
 }
 
@@ -79,13 +73,12 @@ str_substr = {
     'type': 'string',
     'args': ['ntString', 'ntInt', 'ntInt'],
     'constraint': [
-        IntVal(0) < length(),
-        IntVal(0) < length(1),
-        IntVal(0) <= x2,
-        IntVal(0) < x3,
-        x3 <= length(1),
-        x2 < length(1),
-        length() == x3,
+        Int('t.len') == Int('x3'),
+        1 < Int('x1.len'),
+        0 <= x2,
+        x2 <= Int('x1.len'),
+        0 <= x3,
+        x3 == Int('x1.len') - x2
     ]
 }
 
@@ -106,7 +99,8 @@ str_replace = {
         0 < length(1),
         0 < length(2),
         0 < length(3),
-        Implies(length(3) > length(2), length() > length(1)),
-        Implies(length(3) <= length(2), length() <= length(1))
+        Int('x2.len') < Int('x1.len'),
+        Int('x3.len') < Int('x1.len')
+
     ]
 }

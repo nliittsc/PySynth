@@ -30,6 +30,20 @@ def length(i=None):
         x = 'x' + str(i) + '.len'
     return Int(x)
 
+def smax(i=None):
+    if i is None:
+        x = 't.max'
+    else:
+        x = 'x' + str(i) + '.max'
+    return Int(x)
+
+def smin(i=None):
+    if i is None:
+        x = 't.max'
+    else:
+        x = 'x' + str(i) + '.min'
+    return Int(x)
+
 
 productions_map = {
     'str.++': 1,
@@ -74,60 +88,38 @@ def sem(node, inputs):
         if term[0] == '"' and term[-1] == '"':
             if len(term[1:-1]) == 0:
                 return [
-                    length() == 0,
-                    head() == 128,  # unique integer representing an empty string
-                    last() == 128,
+                    Int('t.len') == 0,
+                    Int('t.head') == 128,  # unique integer representing an empty string
+                    Int('t.last') == 128,
                 ]
             #str_enc = [IntVal(ord(c)) for c in term[1:-1]]
             ascii_enc = [ord(c) for c in term[1:-1]]
             return [
-                length() == len(ascii_enc),
-                head() == ascii_enc[0],
-                last() == ascii_enc[-1],
+                Int('t.len') == len(ascii_enc),
+                Int('t.head') == ascii_enc[0],
+                Int('t.last') == ascii_enc[-1],
             ]
         else:  # must be some input
             #int_term = Int(term)
             #print("term:")
             #print(term)
-            for (i, input) in enumerate(inputs):
-                if term == input:
-                    x_len = length(i+1)
-                    x_head = head(i+1)
-                    x_last = last(i+1)
-                    break
-            return [
-                length() == x_len,
-                x_len == Int(term + '.len'),
-                head() == x_head,
-                x_head == Int(term + '.head'),
-                last() == x_last,
-                x_last == Int(term + '.last')
-
-            ]
-            # this is essentially constant time.
-            # for (i, inp) in enumerate(inputs):
-            #     if term == inp:
-            #         x_i = Int('x' + str(i+1))
-            #         int_term = Int(term)
+            # for (i, input) in enumerate(inputs):
+            #     if term == input:
+            #         x_len = length(i+1)
+            #         x_head = head(i+1)
+            #         x_last = last(i+1)
+            #         x_min = smin(i+1)
+            #         x_max = smax(i+1)
             #         break
-            # return [
-            #     length(t) == length(x_i),
-            #     head(t) == head(x_i),
-            #     last(t) == last(x_i),
-            #     length(t) == length(int_term),
-            #     head(t) == head(int_term),
-            #     last(t) == last(int_term),
-            #     t == x_i,
-            #     x_i == int_term
-            # ]
+            return [
+                Int('t.len') == Int(term + '.len'),
+                Int('t.head') == Int(term + '.head'),
+                Int('t.last') == Int(term + '.last')
+            ]
 
     if isinstance(term, str) and term in productions_map.keys():
         code = productions_map[term]
         return semantics_map[code]['constraint']
-
-
-
-
 
 
 # Function that takes as an input an IO example, and creates a presburger
@@ -148,36 +140,31 @@ def abstract(inputs: [str], output: str, input_map):
 
         if len(string_lit) > 0:
             x = Int(x_i)
+            ascii_enc = [ord(ss) for ss in string_lit]
             abstraction_map['raw_inputs'].append((in_term, string_lit))
             abstraction_map['sym_inputs'] += [
-                Int(in_term + '.len') == length(i+1),
-                Int(in_term + '.head') == head(i+1),
-                Int(in_term + '.last') == last(i+1),
-                length(i+1) == IntVal(len(string_lit)),
-                head(i+1) == IntVal(ord(string_lit[0])),
-                last(i+1) == IntVal(ord(string_lit[-1])),
-                #in_str_max == max([ord(c) for c in string_lit]),
-                #in_str_min == min([ord(c) for c in string_lit]),
+                Int(in_term + '.len') == len(string_lit),
+                Int(in_term + '.head') == ord(string_lit[0]),
+                Int(in_term + '.last') == ord(string_lit[-1]),
             ]
         else: # this is for empty strings
             abstraction_map['raw_inputs'].append((in_term, string_lit))
             abstraction_map['sym_inputs'] += [
-                Int(in_term + '.len') == length(i+1),
-                Int(in_term + '.head') == head(i+1),
-                Int(in_term + '.last') == last(i+1),
-                length(i+1) == 0,
-                head(i+1) == 128,
-                last(i+1) == 128
+                Int(in_term + '.len') == 0,
+                Int(in_term + '.head') == 128,
+                Int(in_term + '.last') == 128,
+
             ]
 
     # abstract the outputs, I.e., turn them into SMT formulas
     # Assumes only one output string
     string_lit = output[1:-1]
+    ascii_enc = [ord(c) for c in string_lit]
     if len(string_lit) > 0:
         abstraction_map['sym_outputs'] += [
-            length() == IntVal(len(string_lit)),
-            head() == IntVal(ord(string_lit[0])),
-            last() == IntVal(ord(string_lit[-1])),
+            length() == len(string_lit),
+            head() == ord(string_lit[0]),
+            last() == ord(string_lit[-1]),
         ]
     else:
         abstraction_map['sym_outputs'] += [
@@ -220,8 +207,12 @@ def build_subst_pairs(node):
     return_len = Int(return_id + '.len')
     return_head = Int(return_id + '.head')
     return_last = Int(return_id + '.last')
+    #return_max = Int(return_id + '.max')
+    #return_min = Int(return_id + '.min')
     pair_list = [(t, return_num), (length(), return_len),
-                 (head(), return_head), (last(), return_last)]
+                 (head(), return_head), (last(), return_last),
+                 #(smin(), return_min), (smax(), return_max)
+                 ]
     for i, c in enumerate(node.get_children()):
         in_id = 't'+str(c.id)
         x_id = 'x' + str(i+1)
@@ -230,11 +221,17 @@ def build_subst_pairs(node):
         x_len = length(i+1)
         x_head = head(i+1)
         x_last = last(i+1)
+        #x_max = smax(i+1)
+        #x_min = smin(i+1)
         in_len = Int(in_id + '.len')
         in_head = Int(in_id + '.head')
         in_last = Int(in_id + '.last')
+        #in_max = Int(in_id + '.max')
+        #in_min = Int(in_id + '.min')
         pair_list += [(x_int, in_num), (x_len, in_len), (x_head, in_head),
-                      (x_last, in_last)]
+                      (x_last, in_last),
+                      #(x_min, in_min), (x_max, in_max)
+                      ]
     return pair_list
 
 

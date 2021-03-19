@@ -99,6 +99,13 @@ counts = [i for k, v in productions.items()
           for _, i in v.items()]
 total_count = sum(counts)
 
+for k in productions.keys():
+    probs = productions[k]
+    denom = sum(probs.values())
+    for k1, p in probs.items():
+        probs[k1] = p / denom
+    productions[k] = probs
+
 # store the results
 pcfg = productions
 pcfg['total_counts'] = total_count

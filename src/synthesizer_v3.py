@@ -9,6 +9,7 @@ from copy import deepcopy, copy
 import time
 import json
 import random
+import heapq
 import numpy as np
 
 from src.propogate import propogate
@@ -164,64 +165,151 @@ def accept_solution(candidate_program, knowledge_base, constraints):
     return accept
 
 
-
-def dfs_search(candidate_program, knowledge_base, constraints, max_height,
-               dlevel, start_time, timeout):
-
-
-    elapsed_time = time.time() - start_time
-    # break
-    if elapsed_time > timeout or candidate_program.max_height > max_height:
-        #print("Timeout or depth reached. Exit")
-        return None
-
-    # Propogate on the program, helps fill assignments and verify consistency
-    conflict, concrete = propogate(candidate_program, knowledge_base)
-    if conflict:
-        return None
-    # check if we are done
-    if concrete:
-        accept = accept_solution(candidate_program, knowledge_base, constraints)
-        #accept = smt_interpreter(candidate_program, constraints)
-        if accept:
-            return candidate_program
+def lookup(prob_map, rule):
+    if isinstance(rule, int):
+        return prob_map['literal']
+    elif isinstance(rule, str):
+        if rule[0] == '"' and rule[-1] == '"':
+            return prob_map['literal']
+        elif rule in prob_map.keys():
+            return prob_map[rule]
         else:
+            return prob_map['input']
+
+
+def generate_hypotheses(program, knowledge_base, rule_map, pcfg, max_height=None):
+    program_prob = program.nll()
+    holes = program.get_holes()
+    enc = program.encode() + knowledge_base
+    n = pcfg['total_counts']
+    s = Solver()
+    hypothesis_gen = [(program_prob - lookup(pcfg[h.non_terminal], p[0], n), deepcopy(program), h.id, p)
+                      for h in holes
+                      for p in rule_map[h.non_terminal]
+                      if s.check([encode(h, p)] + enc) != unsat]
+
+    return hypothesis_gen
+
+
+def basic_enumerate(program, knowledge_base, constraints, rule_map, start_time, timeout):
+    wl = [deepcopy(program)]
+    while wl:
+        elapsed_time = time.time() - start_time
+        if elapsed_time > timeout:
+            return None
+        prog = wl.pop(0)
+
+        if prog.is_concrete():
+            accept = smt_interpreter(prog, constraints)
+            if accept:
+                return prog
+            else:
+                knowledge_base.append(block(prog))
+                knowledge_base = [simplify(And(knowledge_base))]
+                continue
+        hole_id = max([h.id for h in prog.get_holes()])
+        h = prog.search(hole_id)
+        #s = Solver()
+        #enc = prog.encode() + knowledge_base
+        #s.push()
+        #s.add(enc)
+        hole = prog.search(hole_id)
+        prods = rule_map[h.non_terminal]
+        #prods = [p for p in prods if s.check([encode(hole, p)] + enc) != unsat]
+        #s.pop()
+        pq = []
+        for p in prods:
+            prog0 = deepcopy(prog)
+            prog0.fill(hole_id, p)
+            num_holes = len(prog0.get_holes())
+            pq.append((num_holes, prog0))
+        pq = sorted(pq, key=lambda tup: tup[0])
+        wl += [prog for _, prog in pq]
+
+
+def fill(prog, hole, rule, pcfg=None):
+    prog0 = deepcopy(prog)
+    prog0.fill(hole.id, rule, pcfg)
+    return prog0
+
+def propogate(prog, hole, rule):
+    if rule[0] == 'str.substr' or rule[0] == 'str.replace':
+        term = random.choice(prog.inputs)
+        w = hole.get_children()[0]
+        prog.fill(w.id, (term, []))
+    if rule[0] == 'str.indexof':
+        w = hole.get_children()[-1]
+        prog.fill(w.id, (0, []))
+
+
+def backtracking(program, knowledge_base, constraints, rule_map,
+                 pcfg, max_height, start_time, timeout):
+    stack = [program]
+    s = Solver()
+    num_pruned = 0
+    while stack:
+        elapsed_time = time.time() - start_time
+        if elapsed_time > timeout:
             return None
 
-    # Continue search
-    hole, productions = decide(candidate_program, knowledge_base, max_height)
-    dlevel += 1
-    if not productions:
-        return None
-
-    # fix top level production, search for the children.
-    for p in productions:
-        prog0 = deepcopy(candidate_program)
-        prog0.fill(hole.id, p)
-        # check conflict
-        #print(f"Applying {p} to hole {hole.id}")
-        unsat_core = check_conflict(prog0, constraints)
-        if unsat_core:
-            #print("Conflict detected")
-            #print("Rejecting Partial Program:")
-            #prog0.print()
-            #print(unsat_core[0])
-            lemma, conflict_levels = analyze_conflict(prog0, unsat_core)
-            #print(f"Learned lemma: ")
-            #pp(lemma)
-            knowledge_base += lemma
-            continue
-            #return None  # backtrack
-        else:  # search continues
-            prog0 = dfs_search(prog0, knowledge_base, constraints, max_height,
-                               dlevel, start_time, timeout)
-
-            if prog0 is None:
-                continue
+        prog = stack.pop()
+        print("popped")
+        prog.print()
+        if prog.is_concrete():
+            accept = smt_interpreter(prog, constraints)
+            if accept:
+                #print(f"PRUNED {num_pruned}")
+                return prog
             else:
-                return prog0
+                knowledge_base.append(block(prog))
+                knowledge_base = [simplify(And(knowledge_base))]
+                continue
 
+        # check which production rules are consistent
+        h_id = prog.worklist_pop()
+        h = prog.search(h_id, return_copy=False)
+        while not h.is_hole():
+            h_id = prog.worklist_pop()
+            h = prog.search(h_id, return_copy=False)
+        #print("filling for ")
+        #prog.print()
+        prods = rule_map[h.non_terminal]
+        #np.random.shuffle(prods)
+        s_ = Solver()
+        enc = prog.encode() + knowledge_base
+        s_.add(enc)
+        new_stack = []
+        for p in prods:
+            #print(f"new rule: {p}")
+            conflict = s_.check(encode(h, p)) == unsat
+            if conflict:
+                continue
+            prog0 = fill(prog, h, p, pcfg)
+            h = prog0.search(h.id, return_copy=False)
+            propogate(prog0, h, p)
+
+            if prog0.max_height <= max_height:
+                unsat_core = check_conflict(prog0, constraints)
+                if unsat_core:
+                    lemma, _ = analyze_conflict(prog0, unsat_core, rule_map)
+                    #print("Learned lemma")
+                    #pp(lemma)
+                    knowledge_base += lemma
+                    knowledge_base = [simplify(And(knowledge_base))]
+                    continue
+
+                new_stack.append(prog0)
+
+        stack += new_stack
+    #print(f"PRUNED {num_pruned}")
     return None
+
+
+
+
+
+
+
 
 
 
@@ -239,19 +327,9 @@ def cdcl_synthesize(timeout, fun_dict, constraints):
                               if p[0] != 'str.to.int'
                               and p[0] != 'ite']
 
-    # lookup = {}
-    # for p in program.prods['ntString']:
-    #     if p[0] not in pcfg['ntString'].keys():
-    #         lookup[p[0]] = False
-    #     else:
-    #         lookup[p[0]] = True
-    # for p in program.prods['ntInt']:
-    #     if p[0] not in pcfg['ntInt'].keys():
-    #         lookup[p[0]] = False
-    #     else:
-    #         lookup[p[0]] = True
-    #print(lookup)
-    #print(program.prods)
+    rule_map = program.prods
+    program.prods = None
+
     start_time = time.time()
     # Program synthesis loop.
     fresh_program = deepcopy(program)
@@ -266,19 +344,20 @@ def cdcl_synthesize(timeout, fun_dict, constraints):
 
         knowledge_base = [simplify(And(knowledge_base))]
         program = deepcopy(fresh_program)
-        dlevel = 1
-        program = dfs_search(program, knowledge_base, constraints, max_height,
-                             dlevel, start_time, timeout)
-
+        #program.print()
+        #program = basic_enumerate(program, knowledge_base, constraints, rule_map, start_time, timeout)
+        program = backtracking(program, knowledge_base, constraints, rule_map, pcfg, max_height,
+                               start_time, timeout)
 
         if program is not None:
-            print(f"FOUND PROGRAM: {program.print()}")
+            #print(f"FOUND PROGRAM: {program.print()}")
             elapsed_time = time.time() - start_time
             verified = smt_interpreter(program, constraints)
             if verified:
                 return program, elapsed_time, True
         else:
             max_height += 1
+            #print(f"increase height to {max_height}")
             continue
 
 

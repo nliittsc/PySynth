@@ -2,7 +2,7 @@ from z3 import *
 from typing import Union, Tuple, Set
 from copy import deepcopy
 from src.commons import productions_map
-
+import numpy as np
 
 
 # Explict about what a 'Production' means. LHS `str` is a terminal symbol, and the RHS `[str]` are the 'inputs',
@@ -126,41 +126,46 @@ class Node:
 class AST:
     def __init__(self, fun_dict):
         #self.grammar = grammar
-        self.fun_name = fun_dict['fun_name']
+        #self.fun_name = fun_dict['fun_name']
         self.inputs = fun_dict['fun_inputs']
-        self.type_dict = fun_dict['type_dict']
-        self.num_inputs = fun_dict['fun_num_inputs']
-        self.non_terminals = fun_dict['grammar'][0]
-        self.terminals = fun_dict['grammar'][1]
+        #self.type_dict = fun_dict['type_dict']
+        #self.num_inputs = fun_dict['fun_num_inputs']
+        #self.non_terminals = fun_dict['grammar'][0]
+        #self.terminals = fun_dict['grammar'][1]
         self.prods = fun_dict['grammar'][2]
         self.start_symbol = fun_dict['grammar'][3]
-        self.return_type = fun_dict['fun_return_type']
-        self.prod_list = [item for sublist in self.prods.values() for item in sublist]
+        #self.return_type = fun_dict['fun_return_type']
+        #self.prod_list = [item for sublist in self.prods.values() for item in sublist]
         self.root = None
         self.arity = None
         self.d_level = 0
-        self.input_dict = {v: 'x' + str(i + 1) for (i, v) in enumerate(self.inputs)}
+        #self.input_dict = {v: 'x' + str(i + 1) for (i, v) in enumerate(self.inputs)}
+
 
         # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
         self.num_nonempty_at_depth = dict()
         self.nodes_at_depth = dict()
-        for i in range(30):
+        for i in range(10):
             self.nodes_at_depth[i] = set()
 
         # Tracks the maximum allowed height of the AST.
         self.max_height = 0
 
         # the current set of holes being considered
-        self.work_list = []
+        self.worklist = []
 
         # the current SAT encoding of the program.
         self.sat_problem = []
 
         # Replacing searches with explicit lookups. Should be more efficient.
         self.graph_ = dict()  # adjacency list type representation. Holds a node at each key
-        #self.leaves = set()  # holds ids of leaf nodes (which might be holes)
-        #self.internal_nodes = set()  # holds ids of non-leaf nodes
-        self.holes = set()  # only holds ids of holes
+
+        # Holds the probabilities of each node in the AST
+        self.probs = dict()
+
+        self.ll = 0
+
+
 
 
     # Computes the maximum arity of the grammar operators
@@ -184,7 +189,9 @@ class AST:
         self.num_nonempty_at_depth[1] = 1
         self.graph_[r.id] = self.root
         self.nodes_at_depth[1].add(self.root)
-        self.holes.add(r.id)
+        self.probs[1] = 0
+        self.worklist.append(1)
+
 
 
     # 'Delete' a node in the AST by making it an empty node
@@ -233,6 +240,9 @@ class AST:
         else:
             return holes
 
+    def worklist_pop(self):
+        return self.worklist.pop(0)
+
     # note: default is to return a deep copy of the target node
     def search(self, id: int, return_copy: bool=True):
         if return_copy:
@@ -240,12 +250,13 @@ class AST:
         else:
             return self.graph_[id]
 
-
-
+    # negative log likelihood
+    def loglike(self):
+        return self.ll
 
     # Fills the target node with a production, spawning children.
     # Also will maintain the set of leaves/internals/holes/adj.list
-    def fill(self, id: int, p: Production):
+    def fill(self, id: int, p: Production, pcfg = None):
         v: Node = self.search(id, return_copy=False)
         assert(v.is_hole() is True)  # This should never fail
         if self.max_height < v.d + 1:
@@ -256,46 +267,29 @@ class AST:
         for w in self.graph_[id].get_children():  # constant time w.r.t. max-arity
             self.graph_[w.id] = w
             self.nodes_at_depth[v.d + 1].add(w)
+            self.worklist.append(w.id)
             flag = True
         if flag:
             self.max_height += 1
 
 
         self.graph_[id].d_level = self.d_level
-
-
-        # queue = [self.root]
-        # while queue:
-        #
-        #     v = queue.pop(0)
-        #     if v.id == id:  # found target node, fill with productions and annotate
-        #         assert(v.is_hole() is True)
-        #         v.apply_prod(p, d_level)
-        #         d = v.d
-        #         k = v.k
-        #         if d+1 not in self.num_at_depth.keys(): # reached new depth level
-        #             # annotate the children
-        #             self.num_at_depth[d+1] = v.num_children
-        #             for (i, c) in enumerate(v.children):
-        #                 c.id = label(k, d+1, i+1)
-        #                 c.d = d + 1
-        #                 c.k = k
-        #                 self.adj_list[c.id] = []
-        #         else:  # need to update the current depth level with num new children
-        #             m = self.num_at_depth[d+1]
-        #             if v.num_children > 0:
-        #                 self.num_at_depth[d + 1] += v.num_children
-        #                 for (i, c) in enumerate(v.children):
-        #                     c.id = label(k, d + 1, i + m + 1)
-        #                     c.d = d + 1
-        #                     c.k = k
-        #                     self.adj_list[c.id] = []
-        #         # copy the children for adjacency list stuff
-        #         self.adj_list[v.id] = v.children
-        #     # target not reached, continue traversal
-        #     else:
-        #         for c in v.children:
-        #             queue.append(c)
+        prob = 0
+        if pcfg is not None:
+            nt = self.graph_[id].non_terminal
+            prob_map = pcfg[nt]
+            rule = self.graph_[id].production
+            if isinstance(rule, int):
+                prob = prob_map['literal']
+            elif isinstance(rule, str):
+                if rule[0] == '"' and rule [-1] == '"':
+                    prob = prob_map['literal']
+                elif rule not in prob_map:
+                    prob = prob_map['input']
+                else:
+                    prob = prob_map[rule]
+            #self.probs[id] = np.log(prob)  # negative for priority queue
+            self.ll += np.log(prob)
 
 
 

@@ -36,7 +36,7 @@ def worker(f):
         return tuple([f, timer, was_success, program.to_program()])
 
 
-results = Parallel(n_jobs=-1, verbose=6)(
+results = Parallel(n_jobs=1, verbose=6)(
         delayed(worker)(f)
         for f in os.listdir(dir)
     )

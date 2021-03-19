@@ -33,9 +33,9 @@ def smt_interpreter(program: AST, constraints):
             #print(f"TEST {i} FAILED")
 
     #print(f"{num_passed} / {num_test} TESTS PASSED")
-    if num_passed == num_test:
-        print("ALL TESTS PASSED!")
-        print("PROGRAM VERIFIED")
+    #if num_passed == num_test:
+        #print("ALL TESTS PASSED!")
+        #print("PROGRAM VERIFIED")
     return num_passed == num_test
 
 

@@ -55,8 +55,7 @@ str_indexof = {
     'constraint': [
         IntVal(0) <= t,
         length(2) <= length(1),
-        IntVal(0) <= x3,
-        x3 < length(1),
+        x3 == 0
     ]
 }
 
@@ -67,7 +66,9 @@ plus = {
     'type': 'int',
     'args': ['ntInt', 'ntInt'],
     'constraint': [
-        t == x1 + x2
+        t == x1 + x2,
+        0 < x1,
+        0 < x2
     ]
 }
 
@@ -77,6 +78,7 @@ minus = {
     'type': 'int',
     'args': ['ntint', 'ntInt'],
     'constraint': [
-        t == x1 - x2
+        t == x1 - x2,
+        x1 != x2
     ]
 }
