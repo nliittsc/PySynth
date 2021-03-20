@@ -1,6 +1,6 @@
-Found Programs: 27/108 = 0.25%
-Avg. Total Runtime (include timeout): 46.97 seconds
-Avg. Success Runtime (no timeout): 7.88
+Found Programs: 28/108 = 0.26%
+Avg. Total Runtime (include timeout): 447.62 seconds
+Avg. Success Runtime (no timeout): 12.26
 Benchmark: firstname-long-repeat.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 0]]]]
 Benchmark: firstname-long.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 0]]]]
 Benchmark: firstname.sl, Program: ['str.substr', ['name', 0, ['str.indexof', ['name', '" "', 0]]]]
@@ -13,6 +13,7 @@ Benchmark: phone-1-long-repeat.sl, Program: ['str.substr', ['name', 4, 3]]
 Benchmark: phone-1-long.sl, Program: ['str.substr', ['name', 4, 3]]
 Benchmark: phone-1.sl, Program: ['str.substr', ['name', 4, 3]]
 Benchmark: phone-1_short.sl, Program: ['str.substr', ['name', 4, 3]]
+Benchmark: phone-2-long-repeat.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]
 Benchmark: phone-2-long.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]
 Benchmark: phone-2.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]
 Benchmark: phone-2_short.sl, Program: ['str.substr', ['name', ['+', [5, 3]], 3]]

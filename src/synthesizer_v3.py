@@ -277,8 +277,8 @@ def backtracking(program, knowledge_base, constraints, rule_map,
         #print("filling for ")
         #prog.print()
         prods = rule_map[h.non_terminal]
+        new_stack = []
         for p in prods:
-
             # #print(f"new rule: {p}")
             prog0 = fill(prog, h, p, pcfg)
             h = prog0.search(h.id, return_copy=False)
@@ -304,8 +304,9 @@ def backtracking(program, knowledge_base, constraints, rule_map,
                     #    knowledge_base.append(lemma)
                     continue
 
-                stack.append(prog0)
-
+                new_stack.append((prog0.loglike(), prog0))
+        new_stack = sorted(new_stack, key=lambda t: t[0], reverse=False)
+        stack += [progr for _, progr in new_stack]
     #print(f"PRUNED {num_pruned}")
     return None
 
@@ -341,9 +342,9 @@ def cdcl_synthesize(timeout, fun_dict, constraints):
 
         program = deepcopy(fresh_program)
         #program.print()
-        #program = basic_enumerate(program, knowledge_base, constraints, rule_map, start_time, timeout)
-        program = backtracking(program, knowledge_base, constraints, rule_map, pcfg, max_height,
-                               start_time, timeout)
+        program = basic_enumerate(program, knowledge_base, constraints, rule_map, start_time, timeout)
+        #program = backtracking(program, knowledge_base, constraints, rule_map, pcfg, max_height,
+        #                       start_time, timeout)
 
         if program is not None:
             #print(f"FOUND PROGRAM: {program.print()}")

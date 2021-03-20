@@ -25,7 +25,7 @@ def worker(f):
         fun_dict = problem['fun_dict'][fun_name]
         for c in problem['constraints']:
             spec.append(abstract_constraint(c, fun_name, fun_dict))
-        timeout = 60
+        timeout = 300
         program, timer, was_success = cdcl_synthesize(timeout, fun_dict, spec)
         if was_success:
             print("Program found for file " + f)
@@ -36,7 +36,7 @@ def worker(f):
         return tuple([f, timer, was_success, program.to_program()])
 
 
-results = Parallel(n_jobs=-1, verbose=6)(
+results = Parallel(n_jobs=10, verbose=6)(
         delayed(worker)(f)
         for f in os.listdir(dir)
     )
@@ -68,7 +68,7 @@ for f, prog in successful_runs:
 
 # store benchmark results locally
 dir = r"C:\Users\18315\Dev\Homework\ProgramSynthesisProject\pysynth\src\tests"
-file = 'cdcl_benchmark_results'
+file = 'enum_benchmark_results_5min'
 path = os.path.join(dir, file)
 with open(path, 'w+') as f:
     f.writelines(output)
