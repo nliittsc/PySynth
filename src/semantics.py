@@ -19,7 +19,7 @@ def sem(symbol):
 
     # operators on strings/integers
     ops = ['str.++', 'str.replace', 'str.at', 'int.to.str', 'str.substr', 'str.len',
-           'str.to.int', 'str.indexof', '+', '-', 'str.prefixof', 'str.suffixof', 'space']
+           'str.to.int', 'str.indexof', '+', '-', 'str.prefixof', 'str.suffixof']
 
 
     if isinstance(symbol, int):  # Terminal integers go to integers
@@ -29,8 +29,11 @@ def sem(symbol):
         return ret_val_b == symbol
 
     if isinstance(symbol, str):  # have to check cases
-        if symbol not in ops:  # I think the symbol is actually just a terminal string here
-            return ret_val_s == String(symbol)
+        if symbol not in ops:
+            if symbol[0] == '"' and symbol[-1] == '"':  # This represents a string literal
+                return ret_val_s == StringVal(symbol[1:-1])  # Dropping the quote marks
+            else:
+                return ret_val_s == String(symbol)  # this represents some variable string, e.g., 'fname'
         else:
 
             # This section returns strings
@@ -44,8 +47,6 @@ def sem(symbol):
                 return ret_val_s == IntToStr(n1)
             if symbol == 'str.substr':  # return a substring of length n2, at offset n1
                 return ret_val_s == SubString(s1, n1, n2)
-            if symbol == 'space':
-                return ret_val_s == StringVal(" ")
 
 
             # This section returns ints
@@ -65,6 +66,37 @@ def sem(symbol):
                 return ret_val_b == PrefixOf(s1, s2)
             if symbol == 'str.suffixof':
                 return ret_val_b == SuffixOf(s1, s2)
+
+
+def sem_constraint(constraint, fun_dict, fun_name):
+    assert(constraint[0] == '=')
+    input_var_list = fun_dict[fun_name]['fun_inputs']
+    input_list = [x for x in constraint[1][1:]]
+    assert(len(input_var_list) == len(input_list))
+    if isinstance(constraint[2], list):
+        output_list = [x for x in constraint[2]]
+    else:
+        output_list = [constraint[2]]
+    smt_constraints = []
+    for var, i in zip(input_var_list, input_list):
+        if len(i) > 1 and i[0] == '"' and i[-1] == '"':
+            smt_constraints.append(String(var) == StringVal(i[1:-1]))
+        else:
+            print("Check this constraint")
+            print(var)
+            print(i)
+            raise ValueError
+
+    for o in output_list:
+        if len(o) > 1 and o[0] == '"' and o[-1] == '"':
+            smt_constraints.append(String('ret_val') == StringVal(o[1:-1]))
+        else:
+            print("check this output")
+            print(o)
+            raise ValueError
+    #print(smt_constraints)
+    return smt_constraints
+
 
 
 

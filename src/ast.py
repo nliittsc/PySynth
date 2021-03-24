@@ -79,16 +79,19 @@ def label(k: int, d:int, i: int) -> int:
 
 # This AST class represents a partial or complete program. One should pass a 4-tuple representing a grammar G
 class AST:
-    def __init__(self, grammar):
-        self.grammar = grammar
-        self.non_terminals = grammar[0]
-        self.terminals = grammar[1]
-        self.prods = grammar[2]
-        self.rules = self.prods  # just an alias
-        self.start_symbol = grammar[3]
+    def __init__(self, fun_dict):
+        #self.grammar = grammar
+        self.fun_name = fun_dict['fun_name']
+        self.inputs = fun_dict['fun_inputs']
+        self.type_dict = fun_dict['type_dict']
+        self.num_inputs = fun_dict['fun_num_inputs']
+        self.non_terminals = fun_dict['grammar'][0]
+        self.terminals = fun_dict['grammar'][1]
+        self.prods = fun_dict['grammar'][2]
+        self.start_symbol = fun_dict['grammar'][3]
+        self.return_type = fun_dict['fun_return_type']
         self.root = None
         self.arity = None
-        self.root = None
 
         # Maintain a dict of the number of nodes at a certain depth. Note: root node must start at depth 1
         self.num_at_depth = {}
